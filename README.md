@@ -2,23 +2,43 @@
 
 Marker is an iPhone app for marking tasks in Formatif, the tutor marking system UNSW CSE runs (it's a fork of Doubtfire). I wanted to work through my marking queue from my phone: see what's waiting, read the submission, leave a comment and set a status, all without opening a laptop.
 
-It's an unofficial client, so it isn't made or endorsed by UNSW or the Formatif team. It's written in SwiftUI for iPhone, needs iOS 18 or later, uses Swift 6, and has no third-party dependencies.
+It's an unofficial client, so it isn't made or endorsed by UNSW or the Formatif team. It isn't on the App Store either. You build it onto your own phone with Xcode, which takes about five minutes (steps below). It's written in SwiftUI for iPhone, needs iOS 18 or later, uses Swift 6, and has no third-party dependencies.
 
-The inbox lists tasks waiting on you, and you can narrow it to your students, one tutorial or the whole unit. Explorer shows one task across tutorials, and Students has a page per student with their tasks and staff notes. Open a task to read the submission PDF and files, check the task sheet, comment, set a status or answer an extension request. There are also CSV exports and local notifications.
+The inbox lists tasks waiting on you, and you can narrow it to your students, one tutorial or the whole unit. Explorer shows one task across tutorials, and Students has a page per student with their tasks and staff notes. Open a task to read the submission PDF and files, check the task sheet, comment, set a status or answer an extension request. There are also CSV exports and local notifications, including reminders when a submission has been waiting too long for feedback.
 
-## Running it
+## Put it on your iPhone
 
-The Xcode project is generated from `project.yml` and isn't checked in, so generate it first:
+You need a Mac with Xcode 16 or later, an iPhone on iOS 18 or later, a cable, and an Apple ID. A free Apple ID is fine.
+
+1. Get the code and open the project. Either clone it:
+
+   ```sh
+   git clone https://github.com/jacksonwanggg/marker-ios.git
+   open marker-ios/Marker.xcodeproj
+   ```
+
+   or use Code > Download ZIP on GitHub, unzip it and double-click `Marker.xcodeproj`.
+
+2. In Xcode, click Marker at the top of the left sidebar, select the Marker target and open Signing & Capabilities. Set Team to your Apple ID (choose Add an Account if it isn't listed). Then change Bundle Identifier to something of your own, like `com.yourname.marker`. The one in the project is registered to me, so Xcode can't sign with it.
+
+3. Plug in your iPhone, unlock it and tap Trust if it asks. Pick the phone from the device menu at the top of the Xcode window and press Run (⌘R).
+
+4. The first time, iOS makes you allow apps from Xcode. Turn on Developer Mode in Settings > Privacy & Security > Developer Mode and restart the phone. With a free Apple ID you also have to trust yourself as a developer: go to Settings > General > VPN & Device Management, tap your Apple ID and choose Trust.
+
+Then open Marker and sign in with UNSW, or tap "Try the demo" to look around on made-up data first.
+
+With a free Apple ID, apps you install from Xcode stop opening after 7 days. Plug the phone in and press Run again to renew it. Your settings carry over. A paid Apple Developer account makes it last a year.
+
+## Changing the project
+
+The Xcode project is generated from `project.yml` with XcodeGen. Both are checked in, so you can open the project without installing anything else. If you add or remove files or change build settings, edit `project.yml` and regenerate:
 
 ```sh
 brew install xcodegen
 xcodegen generate
-open Marker.xcodeproj
 ```
 
-Run `xcodegen generate` again whenever you add or remove files or edit `project.yml`.
-
-To run it on your own iPhone, set your team and a bundle id of your own. Do that in `project.yml` (`DEVELOPMENT_TEAM` and the `PRODUCT_BUNDLE_IDENTIFIER` lines). Changing them in Xcode under Signing & Capabilities works too, but the next `xcodegen generate` throws those changes away.
+Regenerating throws away anything changed in Xcode's project settings, including the team and bundle id from step 2. If you regenerate, put yours in `project.yml` (`DEVELOPMENT_TEAM` and the `PRODUCT_BUNDLE_IDENTIFIER` lines).
 
 ## Tests
 
@@ -31,7 +51,7 @@ This runs the unit tests and the UI tests that drive demo mode. `SSOTests` also 
 
 ## Demo mode
 
-"Try the demo" on the sign-in screen runs the whole app on invented data, and writes are faked. App Review will use this too. For screenshots there are launch arguments, and the last three only work in demo mode:
+"Try the demo" on the sign-in screen runs the whole app on invented data, and writes are faked. For screenshots there are launch arguments, and the last three only work in demo mode:
 
 | Argument | Effect |
 |---|---|
@@ -40,11 +60,7 @@ This runs the unit tests and the UI tests that drive demo mode. `SSOTests` also 
 | `-demoOpen comments` | open a task on one of its tabs (`submission`, `files`, `sheet`, `comments`) |
 | `-demoStudent YES` | open a student page |
 
-## Demo video
-
-`demo/Marker-demo.mp4` is a narrated walkthrough of demo mode. The `demo/` folder is git-ignored, so the video isn't in the repo.
-
-To record it again, run `MarkerUITests/DemoVideoTests` with `TEST_RUNNER_VIDEO_DURATIONS` set to one `sNN=seconds` pair per narration clip (`s01=13.7,s02=14.5,...`). The test drives the app one step per clip and prints when each step starts. Record the simulator with `xcrun simctl io <device> recordVideo` while it runs, then use ffmpeg to lay the clips over the recording at those times.
+`MarkerUITests/DemoVideoTests` drives demo mode for a narrated walkthrough video, one step per narration clip. Set `TEST_RUNNER_VIDEO_DURATIONS` to one `sNN=seconds` pair per clip (`s01=13.7,s02=14.5,...`) and the test prints when each step starts. Record the simulator with `xcrun simctl io <device> recordVideo` while it runs, then use ffmpeg to lay the clips over the recording at those times. The video and clips live in `demo/`, which is git-ignored.
 
 ## Read-only QA against a live unit
 
@@ -94,6 +110,10 @@ You also get:
 
 If you set a status while a comment is still typed, the app offers to send the comment first ("Send and set Complete"). If Formatif refuses the comment, the status isn't changed.
 
+## Privacy
+
+Marker has no server of its own. It only talks to Formatif, plus Microsoft's sign-in page while you sign in. What it keeps stays on the phone: the session in the Keychain, settings in UserDefaults, and cached copies of the unit and inbox so it can open quickly and tell what's new. Signing out clears them. `PrivacyInfo.xcprivacy` declares no tracking and no collected data.
+
 ## Not built yet
 
 - the iPad three-column layout (the target is iPhone only)
@@ -101,7 +121,3 @@ If you set a status while a comment is still typed, the app offers to send the c
 - replying to or editing staff notes (adding and deleting work)
 - camera attachments (Photos and Files work)
 - notification scopes other than "my students"
-
-## App Store notes
-
-The plan is an unlisted App Store release. Because Marker is an unofficial client, get an OK from the Formatif/CSE admins before submitting. `PrivacyInfo.xcprivacy` declares no tracking and no collected data, and `ITSAppUsesNonExemptEncryption` is `NO`. UNSW sign-in needs a staff account, so the review notes should point App Review at "Try the demo".

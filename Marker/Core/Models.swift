@@ -369,23 +369,19 @@ enum Grade {
 
 /// Decodes an array but skips items that fail, so one bad record can't blank a screen.
 struct LossyList<T: Decodable & Sendable>: Decodable, Sendable {
-    var items: [T]
+    var items: [T] = []
     var skipped = 0
 
     init(from decoder: Decoder) throws {
         var c = try decoder.unkeyedContainer()
-        var out: [T] = []
-        var bad = 0
         while !c.isAtEnd {
             if let v = try? c.decode(T.self) {
-                out.append(v)
+                items.append(v)
             } else {
                 _ = try? c.decode(Skip.self)
-                bad += 1
+                skipped += 1
             }
         }
-        items = out
-        skipped = bad
     }
 
     private struct Skip: Decodable {

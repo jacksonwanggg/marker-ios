@@ -122,6 +122,11 @@ import UserNotifications
                     similarityFlag: false, pinned: false, hasExtensions: ext)
     }
 
+    @Test func summaryOnlyMentionsWhatsThere() {
+        let r = Notifier.summaryRequest(inbox: [task(.readyForFeedback), task(.discuss, comments: 1)], lookup: lookup, prefs: Prefs())
+        #expect(r?.content.body == "COMP0000: 1 waiting for feedback and 1 thread with unread comments.")
+    }
+
     @Test func firstRunIsSilent() {
         #expect(Notifier.diff(old: nil, new: [task(.readyForFeedback)], lookup: lookup).isEmpty)
     }

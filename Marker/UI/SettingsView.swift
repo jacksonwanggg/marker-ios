@@ -65,7 +65,7 @@ struct SettingsView: View {
             } header: {
                 Text("Notifications")
             } footer: {
-                Text("Formatif can't send push notifications, so Marker checks your inbox when iOS lets it run in the background. Alerts can come minutes or hours late. Each check only loads the inbox, which Formatif may count as marking activity.")
+                Text("Formatif can't send push notifications, so Marker checks your inbox when iOS lets it run in the background. Alerts can come minutes or hours late. Each check only loads the inbox, so it doesn't open submissions or mark comments read.")
             }
 
             Section {
@@ -146,7 +146,7 @@ struct SettingsView: View {
         .confirmationDialog(model.isDemo ? "Leave the demo?" : "Sign out?", isPresented: $askSignOut, titleVisibility: .visible) {
             Button(model.isDemo ? "Exit demo" : "Sign out", role: .destructive) { Task { await model.signOut() } }
         } message: {
-            if !model.isDemo { Text("This ends your Formatif session and clears the Keychain. You'll need to sign in with UNSW again.") }
+            if !model.isDemo { Text("This ends your Formatif session and removes your sign-in and cached data from this iPhone. You'll need to sign in with UNSW again.") }
         }
     }
 
@@ -228,7 +228,7 @@ struct AboutView: View {
                     Text("Privacy").font(.headline)
                     Text("Marker only talks to formatif.cse.unsw.edu.au. You sign in on Microsoft's own page, so Marker never sees your password. Your Formatif session token stays in the iOS Keychain on this iPhone, and your inbox and student list are cached here so the app opens straight away, even offline. Marker has no server of its own and no analytics or tracking.")
                     Text("Side effects in Formatif").font(.headline)
-                    Text("Opening a comment thread marks it as read. Opening a submission shows up as \"submission opened\" in Formatif's marking analytics. Status changes and comments go to Formatif as soon as you tap them.")
+                    Text("Opening a comment thread marks it as read. Opening a submission shows up as “submission opened” in Formatif's marking analytics. Status changes and comments go to Formatif as soon as you tap them.")
                 }
                 .font(.body)
             }

@@ -30,22 +30,29 @@ actor DemoBackend: MarkerBackend {
     ]
     private static let taskDefs: [TaskDefinition] = {
         let start = Date.now.addingTimeInterval(-28 * 86_400)
-        func td(_ id: Int, _ abbr: String, _ name: String, _ grade: Int, dueIn days: Double) -> TaskDefinition {
-            TaskDefinition(id: id, abbreviation: abbr, name: name,
-                           description: "Give the subproblem definition, the recurrence with base cases, a correctness argument and the running time. Keep it to two pages.",
+        func td(_ id: Int, _ abbr: String, _ name: String, _ grade: Int, dueIn days: Double, _ desc: String) -> TaskDefinition {
+            TaskDefinition(id: id, abbreviation: abbr, name: name, description: desc,
                            targetGrade: grade, dueDate: day(Date.now.addingTimeInterval(days * 86_400)),
                            targetDate: nil, startDate: day(start), hasTaskSheet: true, hasTaskResources: id == 5,
                            isGraded: false, maxQualityPts: 0, discussionPromptsCount: 0)
         }
         return [
-            td(1, "1.1", "(W) Asymptotic notation", 0, dueIn: -22),
-            td(2, "2.1", "(W) Divide and conquer", 0, dueIn: -15),
-            td(3, "2.2", "(W) Master theorem", 1, dueIn: -15),
-            td(4, "3.1", "(W) Greedy exchange argument", 1, dueIn: -8),
-            td(5, "3.2", "(W) Dynamic programming", 2, dueIn: -1),
-            td(6, "4.1", "(W) Shortest paths", 2, dueIn: 6),
-            td(7, "4.2", "(W) Maximum flow", 3, dueIn: 13),
-            td(8, "Q3", "(M) Week 3 Moodle quiz", 0, dueIn: -11),
+            td(1, "1.1", "(W) Asymptotic notation", 0, dueIn: -22,
+               "Rank the eight functions on the task sheet by growth rate and prove each step with limits or the definitions."),
+            td(2, "2.1", "(W) Divide and conquer", 0, dueIn: -15,
+               "Count inversions in an array in O(n log n). Explain the merge step and write down the recurrence."),
+            td(3, "2.2", "(W) Master theorem", 1, dueIn: -15,
+               "Solve the four recurrences with the master theorem. Say which case applies and check its conditions."),
+            td(4, "3.1", "(W) Greedy exchange argument", 1, dueIn: -8,
+               "Give a greedy algorithm for the room booking problem and prove it's optimal with an exchange argument."),
+            td(5, "3.2", "(W) Dynamic programming", 2, dueIn: -1,
+               "Give the subproblem definition, the recurrence with base cases, a correctness argument and the running time. Keep it to two pages."),
+            td(6, "4.1", "(W) Shortest paths", 2, dueIn: 6,
+               "Find the cheapest route when some roads have tolls. Model it as a graph and say which shortest path algorithm you'd run."),
+            td(7, "4.2", "(W) Maximum flow", 3, dueIn: 13,
+               "Reduce the tutor allocation problem to max flow. Draw the network and argue why a max flow gives a valid allocation."),
+            td(8, "Q3", "(M) Week 3 Moodle quiz", 0, dueIn: -11,
+               "Done on Moodle. Nothing to upload here."),
         ]
     }()
 
@@ -135,7 +142,7 @@ actor DemoBackend: MarkerBackend {
         ]
         out[key(10, 3)] = [
             c(10, "status", nil, 110, status: .readyForFeedback),
-            c(10, "text", "You've put the regularity condition on case 2. It belongs with case 3. Section 2 of the task sheet goes through it.", 100, mine: true, read: 80),
+            c(10, "text", "The regularity condition is for case 3, not case 2. Have a look at section 2 of the task sheet.", 100, mine: true, read: 80),
             c(10, "status", nil, 99.9, mine: true, status: .fixAndResubmit),
             c(10, "text", "Ah I had 2 and 3 mixed up. Fixed and resubmitted.", 77.2),
             c(10, "pdf", nil, 77.1, attach: true),

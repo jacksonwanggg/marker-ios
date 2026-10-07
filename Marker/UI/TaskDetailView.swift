@@ -245,8 +245,6 @@ struct SubmissionTab: View {
 struct FilesTab: View {
     @Environment(AppModel.self) private var model
     let detail: TaskDetailModel
-    @State private var openText: ZipEntry?
-    @State private var preview: URL?
 
     var body: some View {
         Group {
@@ -262,22 +260,17 @@ struct FilesTab: View {
                     EmptyState(title: "No files uploaded.")
                 }
             case .done(let bundle?):
-                FileList(bundle: bundle) { open($0) }
+                FileList(bundle: bundle)
             }
         }
-        .navigationDestination(item: $openText) { CodeView(entry: $0) }
-        .quickLookPreview($preview)
         .task { await detail.loadFiles() }
-    }
-
-    private func open(_ e: ZipEntry) {
-        if e.isText { openText = e } else { preview = TempFiles.write(e.data, name: e.name) }
     }
 }
 
 struct FileList: View {
     let bundle: FileBundle
-    let open: (ZipEntry) -> Void
+    @State private var openText: ZipEntry?
+    @State private var preview: URL?
 
     var body: some View {
         List {
@@ -310,6 +303,12 @@ struct FileList: View {
             }
         }
         .listStyle(.plain)
+        .navigationDestination(item: $openText) { CodeView(entry: $0) }
+        .quickLookPreview($preview)
+    }
+
+    private func open(_ e: ZipEntry) {
+        if e.isText { openText = e } else { preview = TempFiles.write(e.data, name: e.name) }
     }
 }
 
@@ -515,8 +514,6 @@ struct TaskInfo: View {
 
 struct ResourcesView: View {
     let detail: TaskDetailModel
-    @State private var openText: ZipEntry?
-    @State private var preview: URL?
 
     var body: some View {
         Group {
@@ -524,15 +521,10 @@ struct ResourcesView: View {
             case .idle, .loading: ProgressView()
             case .failed(let msg): EmptyState(title: "Couldn't load resources.", detail: msg)
             case .done(nil): EmptyState(title: "No resources for this task.")
-            case .done(let b?):
-                FileList(bundle: b) { e in
-                    if e.isText { openText = e } else { preview = TempFiles.write(e.data, name: e.name) }
-                }
+            case .done(let b?): FileList(bundle: b)
             }
         }
         .navigationTitle("Resources")
-        .navigationDestination(item: $openText) { CodeView(entry: $0) }
-        .quickLookPreview($preview)
         .task { await detail.loadResources() }
     }
 }

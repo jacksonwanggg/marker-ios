@@ -90,7 +90,8 @@ final class AppModel {
     var lookup: Lookup {
         Lookup(unitCode: unit?.code ?? "",
                students: projects.mapValues { $0.student.name },
-               taskDefs: taskDefsByID.mapValues { $0.line })
+               taskDefs: taskDefsByID.mapValues { $0.line },
+               moodleTasks: Set(taskDefsByID.values.filter(\.isMoodle).map(\.id)))
     }
 
     func tier(_ t: TaskSummary, now: Date = .now) -> WaitTier {
@@ -166,7 +167,7 @@ final class AppModel {
     // MARK: session
 
     func bootstrap() async {
-        // -demo YES skips sign-in, for screenshots and App Review
+        // -demo YES skips sign-in, for UI tests and screenshots
         if UserDefaults.standard.bool(forKey: "demo") {
             await enterDemo()
             return

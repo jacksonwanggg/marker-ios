@@ -7,6 +7,7 @@ struct Lookup: Codable, Sendable {
     var unitCode: String
     var students: [Int: String]
     var taskDefs: [Int: String]
+    var moodleTasks: Set<Int>? = nil
 
     func title(_ t: TaskSummary) -> String {
         let name = students[t.projectId] ?? "A student"
@@ -106,8 +107,7 @@ enum Notifier {
     static func loadEvents() -> [AlertEvent] { DiskCache.read([AlertEvent].self, "events.json", support: true) ?? [] }
     static func saveEvents(_ events: [AlertEvent]) { DiskCache.write(Array(events.prefix(200)), "events.json", support: true) }
 
-    @discardableResult
-    static func process(unitID: Int, inbox: [TaskSummary], lookup: Lookup, prefs: Prefs, expiry: Date?) async -> [AlertEvent] {
+    static func process(unitID: Int, inbox: [TaskSummary], lookup: Lookup, prefs: Prefs, expiry: Date?) async {
         let snapName = "snapshot-\(unitID).json"
         let old = DiskCache.read([Int: SnapItem].self, snapName, support: true)
         let events = diff(old: old, new: inbox, lookup: lookup)
@@ -117,7 +117,6 @@ enum Notifier {
             for e in events where wants(e, prefs) { await post(e, prefs: prefs) }
         }
         await reschedule(inbox: inbox, lookup: lookup, prefs: prefs, expiry: expiry)
-        return events
     }
 
     static func wants(_ e: AlertEvent, _ p: Prefs) -> Bool {
@@ -152,6 +151,8 @@ enum Notifier {
 
     static func reschedule(inbox: [TaskSummary], lookup: Lookup, prefs: Prefs, expiry: Date?) async {
         let center = UNUserNotificationCenter.current()
+        // Moodle quizzes have nothing to mark here, so leave them out of the badge and reminders
+        let inbox = inbox.filter { lookup.moodleTasks?.contains($0.taskDefinitionId) != true }
         try? await center.setBadgeCount(badgeCount(inbox))
         let pending = await center.pendingNotificationRequests().map(\.identifier)
         center.removePendingNotificationRequests(withIdentifiers: pending.filter { $0.hasPrefix("bump-") || $0 == "daily-summary" || $0 == "expiry" })
@@ -176,7 +177,7 @@ enum Notifier {
                 fire = prefs.outOfQuiet(fire, calendar: cal)
                 guard fire > now else { continue }
                 let content = UNMutableNotificationContent()
-                content.title = tier == .overdue ? "Overdue · \(Fmt.days(days)), no feedback" : "Waiting \(Fmt.days(days))"
+                content.title = tier.tag(days: days)
                 content.body = "\(lookup.title(t)) has waited since \(Fmt.long(submitted)) without feedback."
                 apply(content, key: t.key, comments: false, prefs: prefs, at: fire)
                 content.threadIdentifier = "bumps"
@@ -205,12 +206,14 @@ enum Notifier {
         let unread = inbox.filter { $0.numNewComments > 0 }.count
         let ext = inbox.filter(\.hasExtensions).count
         guard awaiting + unread + ext > 0, let next = nextSummary(after: now, prefs: prefs) else { return nil }
-        let threads = unread == 1 ? "1 thread has" : "\(unread) threads have"
-        let requests = ext == 1 ? "1 extension request needs" : "\(ext) extension requests need"
+        var parts: [String] = []
+        if awaiting > 0 { parts.append("\(awaiting) waiting for feedback") }
+        if unread > 0 { parts.append(unread == 1 ? "1 thread with unread comments" : "\(unread) threads with unread comments") }
+        if ext > 0 { parts.append(ext == 1 ? "1 extension request" : "\(ext) extension requests") }
         let hour = prefs.summaryAt / 60
         let content = UNMutableNotificationContent()
         content.title = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening"
-        content.body = "\(awaiting) waiting for feedback in \(lookup.unitCode). \(threads) unread comments and \(requests) a decision."
+        content.body = "\(lookup.unitCode): \(ListFormatter.localizedString(byJoining: parts))."
         content.categoryIdentifier = category
         content.sound = .default
         let comps = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: next)
