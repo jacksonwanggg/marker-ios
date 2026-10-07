@@ -17,7 +17,10 @@ final class SSOTests: XCTestCase {
         XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'microsoftonline'")).firstMatch.exists
                       || app.buttons.matching(NSPredicate(format: "label CONTAINS 'microsoftonline'")).firstMatch.exists,
                       "host label shows Microsoft's domain")
-        let a = XCTAttachment(screenshot: app.screenshot()); a.name = "S1-microsoft"; a.lifetime = .keepAlways; add(a)
+        let shot = XCTAttachment(screenshot: app.screenshot())
+        shot.name = "S1-microsoft"
+        shot.lifetime = .keepAlways
+        add(shot)
         app.buttons["Cancel"].tap()
         XCTAssertTrue(signIn.waitForExistence(timeout: 5), "cancel returns to sign-in")
     }

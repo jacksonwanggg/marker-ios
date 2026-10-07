@@ -1,6 +1,5 @@
 import XCTest
 
-/// Demo mode end to end: read a submission, comment, set a status, pin, grant an extension.
 @MainActor
 final class MarkerUITests: XCTestCase {
     var app: XCUIApplication!
@@ -23,7 +22,7 @@ final class MarkerUITests: XCTestCase {
         add(a)
     }
 
-    func testMarkATaskEndToEnd() throws {
+    func testMarkTask() throws {
         let row = element(containing: "Priya Raman")
         XCTAssertTrue(row.waitForExistence(timeout: 8))
         row.tap()
@@ -60,7 +59,7 @@ final class MarkerUITests: XCTestCase {
         snap("4-after-status")
     }
 
-    func testPinAndGrantAnExtension() throws {
+    func testPinAndGrantExtension() throws {
         let row = element(containing: "Lucas Ferreira")
         XCTAssertTrue(row.waitForExistence(timeout: 8))
         row.swipeLeft()

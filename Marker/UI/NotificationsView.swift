@@ -77,7 +77,10 @@ struct NotificationsView: View {
                     .markerRow()
             }
 
-            Text("Times show when things happened in Formatif. iOS decides when Marker can check in the background, so an alert can arrive minutes or hours later. Waiting reminders run on this iPhone and count from the submission time.")
+            Text("""
+                Times are when things happened in Formatif. Alerts can come later, since iOS decides when Marker \
+                checks in the background. Waiting reminders count from the submission time.
+                """)
                 .font(.footnote).foregroundStyle(Palette.fg2)
                 .padding(.vertical, 12)
                 .listRowSeparator(.hidden)
@@ -104,6 +107,7 @@ struct NotificationsView: View {
 
 private struct EventRow: View {
     let event: AlertEvent
+
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             Circle().fill(event.seen ? Color.clear : Palette.acc).frame(width: 8, height: 8).padding(.top, 6)

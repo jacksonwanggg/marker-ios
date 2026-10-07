@@ -60,7 +60,8 @@ final class LiveQATests: XCTestCase {
         sheetTab.tap()
         if !sheetTab.isSelected { sleep(1); sheetTab.tap() }
         XCTAssertTrue(sheetTab.isSelected, "Sheet tab selected")
-        XCTAssertTrue(element(containing: "Page 1 of").waitForExistence(timeout: 30) || element(containing: "Details").exists, "task sheet loads")
+        XCTAssertTrue(element(containing: "Page 1 of").waitForExistence(timeout: 30) || element(containing: "Details").exists,
+                      "task sheet loads")
         snap("L05-task-sheet")
 
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH %@", "Comments")).firstMatch.tap()

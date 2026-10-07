@@ -2,7 +2,7 @@ import BackgroundTasks
 import Foundation
 import UserNotifications
 
-/// Names for notification text, cached so background refresh needs no extra API calls.
+// names for notification text, cached so background refresh needs no extra API calls
 struct Lookup: Codable, Sendable {
     var unitCode: String
     var students: [Int: String]
@@ -53,7 +53,7 @@ struct DeepLink: Equatable, Sendable {
     let comments: Bool
 }
 
-/// Formatif has no push, so we diff inbox snapshots and schedule our own local notifications.
+// Formatif has no push, so we diff inbox snapshots and post our own local notifications
 enum Notifier {
     static let refreshTaskID = "com.jacksonwang.marker.refresh"
     static let category = "TASK"
@@ -107,7 +107,7 @@ enum Notifier {
     static func loadEvents() -> [AlertEvent] { DiskCache.read([AlertEvent].self, "events.json", support: true) ?? [] }
     static func saveEvents(_ events: [AlertEvent]) { DiskCache.write(Array(events.prefix(200)), "events.json", support: true) }
 
-    static func process(unitID: Int, inbox: [TaskSummary], lookup: Lookup, prefs: Prefs, expiry: Date?) async {
+    static func sync(unitID: Int, inbox: [TaskSummary], lookup: Lookup, prefs: Prefs, expiry: Date?) async {
         let snapName = "snapshot-\(unitID).json"
         let old = DiskCache.read([Int: SnapItem].self, snapName, support: true)
         let events = diff(old: old, new: inbox, lookup: lookup)
@@ -151,17 +151,18 @@ enum Notifier {
 
     static func reschedule(inbox: [TaskSummary], lookup: Lookup, prefs: Prefs, expiry: Date?) async {
         let center = UNUserNotificationCenter.current()
-        // Moodle quizzes have nothing to mark here, so leave them out of the badge and reminders
+        // nothing to mark for Moodle quizzes, so no badge or reminders
         let inbox = inbox.filter { lookup.moodleTasks?.contains($0.taskDefinitionId) != true }
         try? await center.setBadgeCount(badgeCount(inbox))
-        let pending = await center.pendingNotificationRequests().map(\.identifier)
-        center.removePendingNotificationRequests(withIdentifiers: pending.filter { $0.hasPrefix("bump-") || $0 == "daily-summary" || $0 == "expiry" })
+        let stale = await center.pendingNotificationRequests().map(\.identifier)
+            .filter { $0.hasPrefix("bump-") || $0 == "daily-summary" || $0 == "expiry" }
+        center.removePendingNotificationRequests(withIdentifiers: stale)
         for r in bumpRequests(inbox: inbox, lookup: lookup, prefs: prefs) { try? await center.add(r) }
         if prefs.dailySummary, let r = summaryRequest(inbox: inbox, lookup: lookup, prefs: prefs) { try? await center.add(r) }
         if prefs.notifyExpiry, let expiry, let r = expiryRequest(expiry, hoursBefore: prefs.expiryWarnHours) { try? await center.add(r) }
     }
 
-    /// Timed from the submission, so reminders fire even if background refresh never runs.
+    // timed from the submission, so reminders still fire if background refresh never runs
     static func bumpRequests(inbox: [TaskSummary], lookup: Lookup, prefs: Prefs, now: Date = .now,
                              calendar cal: Calendar = .current) -> [UNNotificationRequest] {
         var items: [(Date, UNNotificationRequest)] = []
@@ -217,18 +218,19 @@ enum Notifier {
         content.categoryIdentifier = category
         content.sound = .default
         let comps = Calendar.current.dateComponents([.year, .month, .day, .hour, .minute], from: next)
-        return UNNotificationRequest(identifier: "daily-summary", content: content, trigger: UNCalendarNotificationTrigger(dateMatching: comps, repeats: false))
+        let trigger = UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
+        return UNNotificationRequest(identifier: "daily-summary", content: content, trigger: trigger)
     }
 
-    static func expiryRequest(_ expiry: Date, hoursBefore: Int = 12, now: Date = .now) -> UNNotificationRequest? {
+    static func expiryRequest(_ expiry: Date, hoursBefore: Int, now: Date = .now) -> UNNotificationRequest? {
         let fire = expiry.addingTimeInterval(-Double(hoursBefore) * 3600)
         guard fire > now else { return nil }
         let content = UNMutableNotificationContent()
         content.title = "Sign in again"
         content.body = "Your UNSW sign-in ends \(Fmt.long(expiry)). Sign in again to keep notifications coming."
         content.sound = .default
-        return UNNotificationRequest(identifier: "expiry", content: content,
-                                     trigger: UNTimeIntervalNotificationTrigger(timeInterval: fire.timeIntervalSince(now), repeats: false))
+        let trigger = UNTimeIntervalNotificationTrigger(timeInterval: fire.timeIntervalSince(now), repeats: false)
+        return UNNotificationRequest(identifier: "expiry", content: content, trigger: trigger)
     }
 
     static func requestAuthorization() async {
@@ -262,6 +264,6 @@ enum Notifier {
         let backend = LiveBackend(client: FormatifClient(credentials: creds))
         guard let inbox = try? await backend.inbox(unitID: unitID, myStudentsOnly: true) else { return }
         DiskCache.write(inbox, "inbox-mine-\(unitID).json", snake: true)
-        await process(unitID: unitID, inbox: inbox, lookup: lookup, prefs: .load(), expiry: creds.refreshExpiry)
+        await sync(unitID: unitID, inbox: inbox, lookup: lookup, prefs: .load(), expiry: creds.refreshExpiry)
     }
 }

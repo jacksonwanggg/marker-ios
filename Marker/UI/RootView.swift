@@ -2,7 +2,7 @@ import SwiftUI
 
 struct TaskRoute: Hashable {
     let key: TaskKey
-    /// The list the task was opened from, used by the up and down buttons.
+    // the list it was opened from, for the up and down buttons
     var context: [TaskSummary] = []
     var fetchedAt: Date = .distantPast
     var openComments = false
@@ -92,10 +92,8 @@ struct MainTabs: View {
             }
         }
     }
-}
 
-extension MainTabs {
-    /// Launch arguments like `-demoTab notifications` open a screen in demo mode.
+    // launch args like -demoTab notifications open a screen in demo mode
     private func openDemoScreen() {
         guard model.isDemo else { return }
         let d = UserDefaults.standard

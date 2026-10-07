@@ -1,6 +1,5 @@
 import SwiftUI
 
-/// All submissions for one task, with status counts and a tutorial filter.
 struct ExplorerView: View {
     @Environment(AppModel.self) private var model
     @State private var tdID: Int?
@@ -24,8 +23,9 @@ struct ExplorerView: View {
     }
 
     private var filtered: [TaskSummary] {
-        scoped.filter { status == nil || $0.status == status }
-            .sorted { model.studentName($0.projectId).localizedCaseInsensitiveCompare(model.studentName($1.projectId)) == .orderedAscending }
+        let name = { (t: TaskSummary) in model.studentName(t.projectId) }
+        return scoped.filter { status == nil || $0.status == status }
+            .sorted { name($0).localizedCaseInsensitiveCompare(name($1)) == .orderedAscending }
     }
 
     var body: some View {
@@ -138,7 +138,7 @@ struct ExplorerView: View {
         }
     }
 
-    /// Opens on the latest (W) task that is already due, or the next one.
+    // latest (W) task that's already due, otherwise the next one
     private func defaultTask() -> Int? {
         let weekly = taskDefs.filter { $0.name.hasPrefix("(W)") }
         let pool = weekly.isEmpty ? taskDefs.filter { !$0.isMoodle } : weekly
@@ -147,17 +147,17 @@ struct ExplorerView: View {
         if let latest = pool.compactMap(target).filter({ $0 <= now }).max() {
             return pool.first { target($0) == latest }?.id
         }
-        let upcoming = pool.filter { (target($0) ?? .distantFuture) > now }
-        return (upcoming.min { (target($0) ?? .distantFuture) < (target($1) ?? .distantFuture) } ?? pool.first ?? taskDefs.first)?.id
+        let next = pool.filter { (target($0) ?? .distantFuture) > now }
+            .min { (target($0) ?? .distantFuture) < (target($1) ?? .distantFuture) }
+        return (next ?? pool.first ?? taskDefs.first)?.id
     }
 
     private func load() async {
         guard let unitID = model.unitID, let tdID else { return }
         loading = true
         defer { loading = false }
-        let b = model.backend
         do {
-            rows = try await b.explorer(unitID: unitID, taskDefID: tdID)
+            rows = try await model.backend.explorer(unitID: unitID, taskDefID: tdID)
             fetchedAt = .now
             error = nil
         } catch {

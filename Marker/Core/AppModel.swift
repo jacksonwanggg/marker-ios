@@ -2,7 +2,7 @@ import Foundation
 import Observation
 import WebKit
 
-/// A local edit. It wins over list data fetched before it.
+// a local edit, wins over list data fetched before it
 struct Patch: Sendable {
     var status: TaskStatus?
     var newComments: Int?
@@ -68,9 +68,7 @@ final class AppModel {
     var events: [AlertEvent] = []
     var toast: Toast?
     var haptic = 0
-    var patches: [TaskKey: Patch] = [:]
-
-    // MARK: lookups
+    private var patches: [TaskKey: Patch] = [:]
 
     var myUserID: Int? { credentials?.userID ?? unitRoles.first?.user?.id }
 
@@ -103,8 +101,6 @@ final class AppModel {
         return "\(u.code) · \(d.formatted(.dateTime.month(.abbreviated).year()))"
     }
 
-    // MARK: patches
-
     func applying(_ t: TaskSummary, fetchedAt: Date) -> TaskSummary {
         guard let p = patches[t.key], p.at > fetchedAt else { return t }
         var t = t
@@ -121,8 +117,6 @@ final class AppModel {
         p.at = .now
         patches[key] = p
     }
-
-    // MARK: inbox
 
     var inboxRows: [TaskSummary] {
         let q = search.trimmingCharacters(in: .whitespaces).lowercased()
@@ -164,8 +158,6 @@ final class AppModel {
         }
     }
 
-    // MARK: session
-
     func bootstrap() async {
         // -demo YES skips sign-in, for UI tests and screenshots
         if UserDefaults.standard.bool(forKey: "demo") {
@@ -177,8 +169,8 @@ final class AppModel {
         let env = ProcessInfo.processInfo.environment
         if let token = env["MARKER_QA_TOKEN"], let user = env["MARKER_QA_USER"] {
             let now = Date.now
-            let c = Credentials(username: user, authToken: token, refreshToken: nil, userID: env["MARKER_QA_USER_ID"].flatMap { Int($0) },
-                                firstName: nil, lastName: nil, signedInAt: now, refreshExpiry: now.addingTimeInterval(7 * 86_400), tokenIssuedAt: now)
+            let c = Credentials(username: user, authToken: token, userID: env["MARKER_QA_USER_ID"].flatMap { Int($0) },
+                                signedInAt: now, refreshExpiry: now.addingTimeInterval(7 * 86_400), tokenIssuedAt: now)
             await startLive(c, persist: false)
             return
         }
@@ -215,11 +207,10 @@ final class AppModel {
         backend = DemoBackend()
         isDemo = true
         let now = Date.now
-        credentials = Credentials(username: "z5123456", authToken: "demo", refreshToken: nil, userID: DemoBackend.me.id,
-                                  firstName: "Alex", lastName: "Tutor", signedInAt: now,
-                                  refreshExpiry: now.addingTimeInterval(7 * 86_400 - 3600), tokenIssuedAt: now)
+        credentials = Credentials(username: "z5123456", authToken: "demo", userID: DemoBackend.me.id, firstName: "Alex", lastName: "Tutor",
+                                  signedInAt: now, refreshExpiry: now.addingTimeInterval(7 * 86_400 - 3600), tokenIssuedAt: now)
         unitID = 1
-        events = DemoFeed.events(now: now)
+        events = DemoBackend.feed(now: now)
         phase = .signedIn
         await loadAll()
     }
@@ -313,7 +304,7 @@ final class AppModel {
             lastRefresh = fetched
             if !isDemo {
                 DiskCache.write(mineInbox, "inbox-mine-\(unitID).json", snake: true)
-                await Notifier.process(unitID: unitID, inbox: mineInbox, lookup: lookup, prefs: prefs, expiry: credentials?.refreshExpiry)
+                await Notifier.sync(unitID: unitID, inbox: mineInbox, lookup: lookup, prefs: prefs, expiry: credentials?.refreshExpiry)
                 events = Notifier.loadEvents()
             }
         } catch {
@@ -382,8 +373,6 @@ final class AppModel {
         phase = .signedOut
     }
 
-    // MARK: errors and toasts
-
     func message(_ error: Error) -> String {
         (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
     }
@@ -404,8 +393,6 @@ final class AppModel {
             if toast == t { toast = nil }
         }
     }
-
-    // MARK: writes
 
     @discardableResult
     func setStatus(_ t: TaskSummary, to status: TaskStatus, grade: Int?, qualityPts: Int) async -> Bool {
@@ -448,8 +435,6 @@ final class AppModel {
         patch(key) { $0.hasExtensions = false }
     }
 
-    // MARK: notifications feed
-
     func markSeen(_ id: String) {
         guard let i = events.firstIndex(where: { $0.id == id }), !events[i].seen else { return }
         events[i].seen = true
@@ -468,20 +453,5 @@ final class AppModel {
         guard let p = try? await backend.project(key.projectID),
               let pt = p.tasks.first(where: { $0.taskDefinitionId == key.taskDefID }) else { return nil }
         return TaskSummary(projectID: p.id, task: pt)
-    }
-}
-
-enum DemoFeed {
-    static func events(now: Date) -> [AlertEvent] {
-        func k(_ sid: Int, _ td: Int) -> TaskKey { TaskKey(projectID: 500 + sid, taskDefID: td) }
-        func h(_ hours: Double) -> Date { now.addingTimeInterval(-hours * 3600) }
-        return [
-            AlertEvent(id: "e1", kind: .newWork, title: "Priya Raman · 3.2 · (W) Dynamic programming", body: "Ready for feedback.", date: h(2), key: k(1, 5), openComments: false, seen: false),
-            AlertEvent(id: "e2", kind: .comment, title: "Tom Okafor · 3.1 · (W) Greedy exchange argument", body: "1 new comment.", date: h(3), key: k(2, 4), openComments: true, seen: false),
-            AlertEvent(id: "e3", kind: .comment, title: "Daniel Kowalski · 3.2 · (W) Dynamic programming", body: "1 new comment.", date: h(8), key: k(4, 5), openComments: true, seen: false),
-            AlertEvent(id: "e4", kind: .resubmission, title: "Daniel Kowalski · 2.2 · (W) Master theorem", body: "Resubmitted. Ready for feedback.", date: h(26), key: k(4, 3), openComments: false, seen: true),
-            AlertEvent(id: "e5", kind: .comment, title: "Aisha Rahman · 3.1 · (W) Greedy exchange argument", body: "2 new comments.", date: h(27), key: k(5, 4), openComments: true, seen: true),
-            AlertEvent(id: "e6", kind: .extensionRequest, title: "Lucas Ferreira · 2.1 · (W) Divide and conquer", body: "Grant or deny it in the thread.", date: h(51), key: k(6, 2), openComments: true, seen: true),
-        ]
     }
 }

@@ -11,7 +11,7 @@ settings:
     SWIFT_STRICT_CONCURRENCY: complete
     MARKETING_VERSION: "1.0"
     CURRENT_PROJECT_VERSION: "1"
-    # your Apple team id (or set it in Xcode > Signing)
+    # your Apple team id, or pick a team under Signing & Capabilities in Xcode
     DEVELOPMENT_TEAM: ZQCJYCF2FX
     CODE_SIGN_STYLE: Automatic
 targets:

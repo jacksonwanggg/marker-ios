@@ -41,7 +41,6 @@ struct ConfirmStatusSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     let request: ConfirmRequest
-    /// Set when opened from a task, so a typed comment can be sent first.
     var detail: TaskDetailModel?
     var onSent: (() -> Void)?
 
@@ -56,6 +55,7 @@ struct ConfirmStatusSheet: View {
         guard let d = detail?.draft.trimmingCharacters(in: .whitespacesAndNewlines), !d.isEmpty else { return nil }
         return d
     }
+    private var sendsComment: Bool { draft != nil && withComment }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -86,8 +86,8 @@ struct ConfirmStatusSheet: View {
                     Text(draft).lineLimit(2)
                 }
             }
-            Text(draft != nil && withComment
-                 ? "The comment goes first, then the status. If Formatif refuses the comment, the status isn't changed and the comment stays in the box."
+            Text(sendsComment
+                 ? "The comment goes first. If Formatif refuses it, the status isn't changed and the comment stays in the box."
                  : "The status goes to Formatif straight away. If Formatif refuses it, the status rolls back and you'll see why.")
                 .font(.footnote)
                 .foregroundStyle(Palette.fg2)
@@ -103,7 +103,7 @@ struct ConfirmStatusSheet: View {
                 Button {
                     send()
                 } label: {
-                    Text(draft != nil && withComment ? "Send and set \(request.target.label)" : "Set \(request.target.label)")
+                    Text(sendsComment ? "Send and set \(request.target.label)" : "Set \(request.target.label)")
                         .font(.headline).lineLimit(1).minimumScaleFactor(0.7)
                         .frame(maxWidth: .infinity, minHeight: 50)
                 }
@@ -124,7 +124,7 @@ struct ConfirmStatusSheet: View {
         let g: Int? = graded ? grade : nil
         let q = graded ? quality : -1
         let done = onSent
-        let detail = withComment && draft != nil ? self.detail : nil
+        let detail = sendsComment ? self.detail : nil
         dismiss()
         Task {
             if let detail, !(await detail.sendDraft()) {

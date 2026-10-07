@@ -71,7 +71,8 @@ struct InboxView: View {
                 model.waitingOnly = false
             }
         } else if model.scope != .all {
-            EmptyState(title: "Nothing to mark.", detail: model.scope == .mine ? "Your students are all caught up." : "\(model.scopeLabel) is all caught up.", action: "Show all students") { model.scope = .all }
+            let detail = model.scope == .mine ? "Your students are all caught up." : "\(model.scopeLabel) is all caught up."
+            EmptyState(title: "Nothing to mark.", detail: detail, action: "Show all students") { model.scope = .all }
         } else {
             EmptyState(title: "Nothing to mark.")
         }
@@ -97,7 +98,7 @@ private struct InboxHeader: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     MenuChip(title: model.scopeLabel, on: model.scope != .mine) {
-                        // Units can have 50+ tutorials, so the rest go in a submenu.
+                        // units can have 50+ tutorials, so the rest go in a submenu
                         scopeButton("My students", .mine)
                         scopeButton("All students", .all)
                         let mine = tutorials.filter { model.myTutorialIDs.contains($0.id) }
@@ -122,7 +123,8 @@ private struct InboxHeader: View {
                     MenuChip(title: model.statusFilter?.label ?? "Any status", on: model.statusFilter != nil) {
                         Picker("Status", selection: $model.statusFilter) {
                             Text("Any status").tag(TaskStatus?.none)
-                            ForEach([TaskStatus.readyForFeedback, .needHelp, .discuss, .workingOnIt, .fixAndResubmit, .demonstrate, .complete]) { s in
+                            ForEach([TaskStatus.readyForFeedback, .needHelp, .discuss, .workingOnIt,
+                                     .fixAndResubmit, .demonstrate, .complete]) { s in
                                 Text(s.label).tag(TaskStatus?.some(s))
                             }
                         }
@@ -169,7 +171,7 @@ struct InboxRow: View {
     var body: some View {
         let tier = model.tier(task)
         let flags = Self.flags(task)
-        HStack(alignment: .center, spacing: 12) {
+        HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 6) {
                     if task.pinned {

@@ -37,7 +37,7 @@ struct SignInView: View {
                 MarkerLogo()
                 VStack(alignment: .leading, spacing: 8) {
                     Text("Marker").font(.markerLargeTitle)
-                    Text("Mark Formatif tasks from your phone: read the submission, leave a comment and set the status.")
+                    Text("Mark Formatif tasks from your phone.")
                         .font(.body)
                         .foregroundStyle(Palette.fg2)
                 }
@@ -108,7 +108,6 @@ struct SignInView: View {
     }
 }
 
-/// Microsoft sign-in in a web view. The redirect back to Formatif carries a one-time token.
 struct SSOSheet: View {
     let url: URL
     let onToken: (String, String) -> Void
@@ -166,6 +165,7 @@ struct SSOWebView: UIViewRepresentable {
         nonisolated static func token(from url: URL) -> (String, String)? {
             guard url.host == FormatifClient.host else { return nil }
             var items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+            // the one-time token can also come after the # route
             if let frag = url.fragment, let q = frag.split(separator: "?", maxSplits: 1).last,
                let extra = URLComponents(string: "x://y?\(q)")?.queryItems {
                 items += extra
@@ -188,9 +188,20 @@ struct SSOWebView: UIViewRepresentable {
             return .allow
         }
 
-        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { parent.loading = true }
-        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { parent.loading = false }
-        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) { parent.loading = false }
-        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) { parent.loading = false }
+        func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) {
+            parent.loading = true
+        }
+
+        func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+            parent.loading = false
+        }
+
+        func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+            parent.loading = false
+        }
+
+        func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+            parent.loading = false
+        }
     }
 }

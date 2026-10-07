@@ -55,7 +55,7 @@ struct TaskDefinition: Codable, Hashable, Sendable, Identifiable {
     var discussionPromptsCount: Int?
     var uploadRequirements: [UploadRequirement]?
 
-    /// False for (E), (D) and (M) tasks, which have nothing to upload. nil if unknown.
+    // (E), (D) and (M) tasks have nothing to upload
     var hasUploads: Bool? { uploadRequirements.map { !$0.isEmpty } }
 
     var isMoodle: Bool { name.hasPrefix("(M)") || abbreviation.hasPrefix("(M)") }
@@ -131,12 +131,11 @@ struct Student: Codable, Hashable, Sendable {
 }
 
 struct TutorialEnrolment: Codable, Hashable, Sendable {
-    /// Can be null for students who aren't in a class yet.
     var tutorialId: Int?
     var streamAbbr: String?
 }
 
-/// A student's enrolment. Formatif calls it a project.
+// a student's enrolment, Formatif calls it a project
 struct ProjectSummary: Codable, Hashable, Sendable, Identifiable {
     let id: Int
     var student: Student
@@ -367,7 +366,7 @@ enum Grade {
     }
 }
 
-/// Decodes an array but skips items that fail, so one bad record can't blank a screen.
+// skips items that fail to decode so one bad record can't blank a screen
 struct LossyList<T: Decodable & Sendable>: Decodable, Sendable {
     var items: [T] = []
     var skipped = 0
@@ -390,12 +389,11 @@ struct LossyList<T: Decodable & Sendable>: Decodable, Sendable {
 }
 
 extension KeyedDecodingContainer {
-    /// A missing key, null or wrong type all give nil.
     func opt<T: Decodable>(_ type: T.Type, _ key: Key) -> T? {
         (try? decodeIfPresent(type, forKey: key)) ?? nil
     }
 
-    /// Formatif sends some flags as 0/1 and others as true/false.
+    // Formatif sends some flags as 0/1 and others as true/false
     func flexBool(_ key: Key) -> Bool {
         if let b = opt(Bool.self, key) { return b }
         if let i = opt(Int.self, key) { return i != 0 }

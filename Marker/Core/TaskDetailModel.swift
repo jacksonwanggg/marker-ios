@@ -12,13 +12,11 @@ enum Load<T> {
 enum SubmissionState {
     case none
     case noUploads
-    /// Submitted but there's no PDF. Regenerating usually fixes it.
-    case noPDF
+    case noPDF // submitted but no PDF, regenerating usually fixes it
     case processing
     case pdf(PDFDocument, name: String)
 }
 
-/// Each tab loads when it's opened. Comments are never prefetched because fetching them marks them read.
 @MainActor @Observable
 final class TaskDetailModel {
     let key: TaskKey
@@ -26,15 +24,13 @@ final class TaskDetailModel {
     private let model: AppModel
     private var backend: any MarkerBackend { model.backend }
 
-    var details: SubmissionDetails?
     var submission: Load<SubmissionState> = .idle
     var files: Load<FileBundle?> = .idle
     var sheet: Load<PDFDocument?> = .idle
     var resources: Load<FileBundle?> = .idle
     var comments: Load<[Comment]> = .idle
     var sending = false
-    /// Lives here so a half-typed comment survives tab switches.
-    var draft = ""
+    var draft = "" // lives here so a half-typed comment survives tab switches
     var sendError: String?
     var replyTo: Comment?
     private var nextLocalID = -1
@@ -44,10 +40,6 @@ final class TaskDetailModel {
         self.unitID = unitID
         self.model = model
     }
-
-    private func msg(_ e: Error) -> String { model.message(e) }
-
-    // MARK: submission
 
     func loadSubmission(force: Bool = false) async {
         guard force || submission.isIdle else { return }
@@ -59,7 +51,6 @@ final class TaskDetailModel {
         let b = backend, k = key
         do {
             let d = try await b.submissionDetails(k)
-            details = d
             // a fresh upload reports has_pdf false while Formatif is still building it
             if d.processingPdf == true {
                 submission = .done(.processing)
@@ -74,7 +65,7 @@ final class TaskDetailModel {
             let name = "\(model.zid(k.projectID))-\(model.taskDef(k.taskDefID)?.abbreviation ?? "task").pdf"
             submission = .done(.pdf(doc, name: name))
         } catch {
-            submission = .failed(msg(error))
+            submission = .failed(model.message(error))
             model.handle(error, quiet: true)
         }
     }
@@ -86,11 +77,9 @@ final class TaskDetailModel {
             model.show("PDF regeneration requested")
             await loadSubmission(force: true)
         } catch {
-            model.show(msg(error), error: true)
+            model.show(model.message(error), error: true)
         }
     }
-
-    // MARK: files and sheet
 
     func loadFiles() async {
         guard files.isIdle else { return }
@@ -100,7 +89,7 @@ final class TaskDetailModel {
         }
         files = .loading
         let b = backend, k = key
-        do { files = .done(try await b.submissionFiles(k)) } catch { files = .failed(msg(error)) }
+        do { files = .done(try await b.submissionFiles(k)) } catch { files = .failed(model.message(error)) }
     }
 
     func loadSheet(hasSheet: Bool) async {
@@ -112,7 +101,7 @@ final class TaskDetailModel {
             let data = try await b.taskSheet(unitID: u, taskDefID: td)
             sheet = .done(Zip.isPDF(data) ? PDFDocument(data: data) : nil)
         } catch {
-            sheet = .failed(msg(error))
+            sheet = .failed(model.message(error))
         }
     }
 
@@ -120,10 +109,12 @@ final class TaskDetailModel {
         guard resources.isIdle else { return }
         resources = .loading
         let b = backend, u = unitID, td = key.taskDefID
-        do { resources = .done(try await b.taskResources(unitID: u, taskDefID: td)) } catch { resources = .failed(msg(error)) }
+        do {
+            resources = .done(try await b.taskResources(unitID: u, taskDefID: td))
+        } catch {
+            resources = .failed(model.message(error))
+        }
     }
-
-    // MARK: comments
 
     func loadComments(force: Bool = false) async {
         guard force || comments.isIdle else { return }
@@ -133,13 +124,12 @@ final class TaskDetailModel {
             comments = .done(try await b.comments(k))
             model.markRead(k)
         } catch {
-            if comments.value == nil { comments = .failed(msg(error)) }
+            if comments.value == nil { comments = .failed(model.message(error)) }
             model.handle(error, quiet: true)
         }
     }
 
-    /// Shows the comment straight away and takes it back out if Formatif refuses it.
-    func send(_ text: String) async -> Bool {
+    private func send(_ text: String) async -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !sending else { return false }
         sending = true
@@ -158,7 +148,7 @@ final class TaskDetailModel {
         } catch {
             remove(local.id)
             replyTo = reply
-            sendError = msg(error)
+            sendError = model.message(error)
             return false
         }
     }
@@ -182,7 +172,7 @@ final class TaskDetailModel {
             append(saved)
             model.haptic += 1
         } catch {
-            sendError = msg(error)
+            sendError = model.message(error)
         }
     }
 
@@ -193,7 +183,7 @@ final class TaskDetailModel {
             remove(c.id)
             model.show("Comment deleted")
         } catch {
-            model.show(msg(error), error: true)
+            model.show(model.message(error), error: true)
         }
     }
 
@@ -209,7 +199,7 @@ final class TaskDetailModel {
             }
             return TempFiles.write(file.data, name: name)
         } catch {
-            model.show(msg(error), error: true)
+            model.show(model.message(error), error: true)
             return nil
         }
     }
@@ -222,11 +212,11 @@ final class TaskDetailModel {
             model.show(granted ? "Extension granted" : "Extension denied")
             await loadComments(force: true)
         } catch {
-            model.show(msg(error), error: true)
+            model.show(model.message(error), error: true)
         }
     }
 
-    /// Formatif posts a comment for every status change, so reload the thread.
+    // Formatif posts a comment for every status change
     func statusChanged() async {
         if comments.value != nil { await loadComments(force: true) }
     }

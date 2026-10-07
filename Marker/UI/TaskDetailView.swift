@@ -1,3 +1,4 @@
+import QuickLook
 import SwiftUI
 
 enum DetailTab: String, CaseIterable, Identifiable {
@@ -150,9 +151,7 @@ struct TaskDetailView: View {
 
     private func load(_ key: TaskKey) async {
         notFound = false
-        if base?.key != key {
-            base = route.context.first { $0.key == key }
-        }
+        if base?.key != key { base = route.context.first { $0.key == key } }
         if base == nil { base = await model.summary(for: key) }
         guard base != nil else { notFound = true; return }
         if detail?.key != key { detail = TaskDetailModel(key: key, unitID: model.unitID ?? 0, model: model) }
@@ -202,8 +201,6 @@ struct SegmentBar: View {
     }
 }
 
-// MARK: - Submission
-
 struct SubmissionTab: View {
     let detail: TaskDetailModel
     let dueLine: String
@@ -216,31 +213,31 @@ struct SubmissionTab: View {
                     .font(.footnote)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             case .failed(let msg):
-                EmptyState(title: "Couldn't load the submission.", detail: msg, action: "Try again") {
-                    Task { await detail.loadSubmission(force: true) }
-                }
+                EmptyState(title: "Couldn't load the submission.", detail: msg, action: "Try again", perform: reload)
             case .done(.none):
                 EmptyState(title: "No submission yet.", detail: dueLine)
             case .done(.noUploads):
-                EmptyState(title: "Nothing to upload for this task.", detail: "It's assessed by its status, in class or on Moodle.")
+                EmptyState(title: "Nothing to upload for this task.",
+                           detail: "It's assessed by its status, in class or on Moodle.")
             case .done(.processing):
-                EmptyState(title: "Formatif is still building the PDF.", detail: "Formatif builds PDFs every 5 minutes, so it can take up to about 15.", action: "Check again") {
-                    Task { await detail.loadSubmission(force: true) }
-                }
+                EmptyState(title: "Formatif is still building the PDF.",
+                           detail: "It builds PDFs every 5 minutes, so it can take up to about 15.",
+                           action: "Check again", perform: reload)
             case .done(.noPDF):
                 EmptyState(title: "Formatif has no PDF for this submission.",
-                           detail: "The uploaded files are under Files. Regenerate PDF is in the ••• menu.", action: "Check again") {
-                    Task { await detail.loadSubmission(force: true) }
-                }
+                           detail: "The uploaded files are under Files. Regenerate PDF is in the ••• menu.",
+                           action: "Check again", perform: reload)
             case .done(.pdf(let doc, let name)):
                 PDFPane(document: doc, name: name)
             }
         }
         .task { await detail.loadSubmission() }
     }
-}
 
-// MARK: - Files
+    private func reload() {
+        Task { await detail.loadSubmission(force: true) }
+    }
+}
 
 struct FilesTab: View {
     @Environment(AppModel.self) private var model
@@ -289,7 +286,10 @@ struct FileList: View {
                             .foregroundStyle(Palette.fg2)
                             .frame(width: 36, height: 36)
                             .background(Palette.fill, in: RoundedRectangle(cornerRadius: 8))
-                        Text(e.path).font(.system(.subheadline, design: .monospaced)).lineLimit(1).truncationMode(.middle)
+                        Text(e.path)
+                            .font(.system(.subheadline, design: .monospaced))
+                            .lineLimit(1)
+                            .truncationMode(.middle)
                             .foregroundStyle(Palette.fg)
                         Spacer(minLength: 8)
                         Text(Fmt.size(e.size)).font(.footnote).monospacedDigit().foregroundStyle(Palette.fg2)
@@ -416,8 +416,6 @@ enum Highlighter {
         return out
     }
 }
-
-// MARK: - Task sheet
 
 struct SheetTab: View {
     @Environment(AppModel.self) private var model

@@ -1,4 +1,5 @@
 import PhotosUI
+import QuickLook
 import SwiftUI
 import UniformTypeIdentifiers
 
@@ -28,7 +29,8 @@ struct CommentsTab: View {
         }
         .task { await detail.loadComments() }
         .quickLookPreview($preview)
-        .confirmationDialog("Delete this comment?", isPresented: Binding(get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } }),
+        .confirmationDialog("Delete this comment?",
+                            isPresented: Binding(get: { confirmDelete != nil }, set: { if !$0 { confirmDelete = nil } }),
                             titleVisibility: .visible, presenting: confirmDelete) { c in
             Button("Delete", role: .destructive) { Task { await detail.delete(c) } }
         } message: { _ in
@@ -78,13 +80,16 @@ struct CommentsTab: View {
     private func statusLine(_ c: Comment, mine: Bool) -> String {
         let s = TaskStatus(key: c.status ?? c.taskStatus)
         let who = mine ? "You" : (c.author?.first ?? "Someone")
-        let what = !mine && s == .readyForFeedback ? "\(who) submitted · Ready for feedback" : "\(who) set the status to \(s.label)"
+        let what = !mine && s == .readyForFeedback
+            ? "\(who) submitted · Ready for feedback"
+            : "\(who) set the status to \(s.label)"
         return "\(what) · \(Fmt.thread(c.created))"
     }
 
     private func bubble(_ c: Comment, mine: Bool, replyTo: Comment?) -> some View {
         let isSelected = selected == c.id
         let pending = c.id < 0
+        let caption = meta(c, mine: mine, pending: pending)
         let shape = UnevenRoundedRectangle(topLeadingRadius: 18, bottomLeadingRadius: mine ? 18 : 4,
                                            bottomTrailingRadius: mine ? 4 : 18, topTrailingRadius: 18)
         return VStack(alignment: mine ? .trailing : .leading, spacing: 2) {
@@ -119,20 +124,22 @@ struct CommentsTab: View {
             .frame(maxWidth: 300, alignment: mine ? .trailing : .leading)
             .onTapGesture { if !pending { selected = isSelected ? nil : c.id } }
             .contextMenu {
-                if let text = c.comment, !c.isAttachment { Button("Copy", systemImage: "doc.on.doc") { UIPasteboard.general.string = text } }
+                if let text = c.comment, !c.isAttachment {
+                    Button("Copy", systemImage: "doc.on.doc") { UIPasteboard.general.string = text }
+                }
                 if !mine { Button("Reply", systemImage: "arrowshape.turn.up.left") { detail.replyTo = c } }
-                if c.isAttachment, !pending { Button("Open", systemImage: "eye") { Task { preview = await detail.attachment(c) } } }
+                if c.isAttachment, !pending { Button("Open", systemImage: "eye") { open(c) } }
                 if mine, !pending { Button("Delete", systemImage: "trash", role: .destructive) { confirmDelete = c } }
             }
 
-            Text(meta(c, mine: mine, pending: pending))
+            Text(caption)
                 .font(.system(size: 11)).monospacedDigit().foregroundStyle(Palette.fg2)
                 .padding(.horizontal, 6)
 
             if isSelected {
                 HStack(spacing: 8) {
                     if !mine { actionButton("Reply") { detail.replyTo = c; selected = nil } }
-                    if c.isAttachment { actionButton("Open") { Task { preview = await detail.attachment(c) } } }
+                    if c.isAttachment { actionButton("Open") { open(c) } }
                     if mine { actionButton("Delete", destructive: true) { confirmDelete = c; selected = nil } }
                 }
                 .padding(.bottom, 6)
@@ -140,8 +147,12 @@ struct CommentsTab: View {
         }
         .frame(maxWidth: .infinity, alignment: mine ? .trailing : .leading)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(mine ? "You" : c.author?.first ?? "Student"): \(c.comment ?? attachmentLabel(c)). \(meta(c, mine: mine, pending: pending))")
+        .accessibilityLabel("\(mine ? "You" : c.author?.first ?? "Student"): \(c.comment ?? attachmentLabel(c)). \(caption)")
         .accessibilityAction(named: "Show actions") { selected = c.id }
+    }
+
+    private func open(_ c: Comment) {
+        Task { preview = await detail.attachment(c) }
     }
 
     private func attachmentLabel(_ c: Comment) -> String {
@@ -221,7 +232,7 @@ struct ExtensionCard: View {
 struct Composer: View {
     @Environment(AppModel.self) private var model
     @Bindable var detail: TaskDetailModel
-    /// Text restored after a failed send. Editing it hides the error.
+    // the text put back after a failed send, so only an edit clears the error
     @State private var restored: String?
     @State private var showPhotos = false
     @State private var showFiles = false
@@ -275,7 +286,11 @@ struct Composer: View {
 
                 Button(action: send) {
                     Group {
-                        if detail.sending { ProgressView().tint(Palette.accOn) } else { Image(systemName: "arrow.up").font(.body.weight(.bold)) }
+                        if detail.sending {
+                            ProgressView().tint(Palette.accOn)
+                        } else {
+                            Image(systemName: "arrow.up").font(.body.weight(.bold))
+                        }
                     }
                     .foregroundStyle(canSend ? Palette.accOn : Palette.fg3)
                     .frame(width: 36, height: 36)

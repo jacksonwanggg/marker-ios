@@ -18,12 +18,13 @@ struct SettingsView: View {
                 Text("Account")
             } footer: {
                 Text(model.prefs.notifyExpiry
-                     ? "UNSW sign-in lasts seven days, then you have to sign in again. Marker reminds you \(Self.hours(model.prefs.expiryWarnHours)) before that."
-                     : "UNSW sign-in lasts seven days, then you have to sign in again.")
+                     ? "UNSW sign-in lasts seven days. Marker reminds you \(Self.hours(model.prefs.expiryWarnHours)) before it expires."
+                     : "UNSW sign-in lasts seven days.")
             }
 
             Section("Unit") {
-                Picker("Unit", selection: Binding(get: { model.unitID ?? -1 }, set: { id in Task { await model.selectUnit(id) } })) {
+                Picker("Unit", selection: Binding(get: { model.unitID ?? -1 },
+                                                  set: { id in Task { await model.selectUnit(id) } })) {
                     ForEach(model.unitRoles) { r in Text(model.unitLabel(r.unit)).tag(r.unit.id) }
                 }
             }
@@ -31,7 +32,9 @@ struct SettingsView: View {
             Section {
                 if notifStatus == .denied {
                     Button("Turn on notifications in iOS Settings") {
-                        if let url = URL(string: UIApplication.openNotificationSettingsURLString) { UIApplication.shared.open(url) }
+                        if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
                     }
                 } else if notifStatus == .notDetermined {
                     Button("Allow notifications") { Task { await Notifier.requestAuthorization(); await checkNotifs() } }
@@ -65,7 +68,11 @@ struct SettingsView: View {
             } header: {
                 Text("Notifications")
             } footer: {
-                Text("Formatif can't send push notifications, so Marker checks your inbox when iOS lets it run in the background. Alerts can come minutes or hours late. Each check only loads the inbox, so it doesn't open submissions or mark comments read.")
+                Text("""
+                    Formatif doesn't send push notifications, so Marker checks your inbox in the background \
+                    when iOS lets it. Alerts can be minutes or hours late. Checks only load the inbox and \
+                    never open submissions or comments.
+                    """)
             }
 
             Section {
@@ -80,14 +87,14 @@ struct SettingsView: View {
                         .padding(.leading, 12)
                     }
                 }
-                Picker("Remind me", selection: Binding(get: { model.prefs.bumpAt != nil },
-                                                       set: { fixed in withAnimation { model.prefs.bumpAt = fixed ? (model.prefs.bumpAt ?? 9 * 60) : nil } })) {
+                Picker("Remind me", selection: Binding(get: { model.prefs.bumpAt != nil }, set: { fixed in
+                    withAnimation { model.prefs.bumpAt = fixed ? (model.prefs.bumpAt ?? 9 * 60) : nil }
+                })) {
                     Text("At the submission time").tag(false)
                     Text("At a set time").tag(true)
                 }
-                if model.prefs.bumpAt != nil {
-                    DatePicker("Time", selection: clock(Binding(get: { model.prefs.bumpAt ?? 9 * 60 }, set: { model.prefs.bumpAt = $0 })),
-                               displayedComponents: .hourAndMinute)
+                if let at = Binding($model.prefs.bumpAt) {
+                    DatePicker("Time", selection: clock(at), displayedComponents: .hourAndMinute)
                 }
                 Button("Reset to 2, 3, 4 days and a week") {
                     withAnimation { model.prefs.bumpAfter = Prefs.defaultBumpAfter }
@@ -128,7 +135,8 @@ struct SettingsView: View {
                 Section("Debug") {
                     LabeledContent("Refresh token", value: model.credentials?.refreshToken == nil ? "missing" : "present")
                     LabeledContent("User id", value: model.myUserID.map(String.init) ?? "unknown")
-                    LabeledContent("My tutorials", value: model.myTutorialIDs.compactMap { model.tutorial($0)?.abbreviation }.joined(separator: ", "))
+                    let tutorials = model.myTutorialIDs.compactMap { model.tutorial($0)?.abbreviation }
+                    LabeledContent("My tutorials", value: tutorials.joined(separator: ", "))
                     Button("Test token refresh") { Task { await model.testRefresh() } }
                 }
             }
@@ -138,7 +146,7 @@ struct SettingsView: View {
                 NavigationLink("About and privacy") { AboutView() }
                 Button(model.isDemo ? "Exit demo" : "Sign out", role: .destructive) { askSignOut = true }
             } footer: {
-                Text("Marker is an unofficial client for Formatif (UNSW CSE). Your data only goes between this iPhone and Formatif, and Marker doesn't collect any of it.")
+                Text("Marker is an unofficial Formatif client. Your data only goes between this iPhone and Formatif.")
             }
         }
         .navigationTitle("Settings")
@@ -146,28 +154,33 @@ struct SettingsView: View {
         .confirmationDialog(model.isDemo ? "Leave the demo?" : "Sign out?", isPresented: $askSignOut, titleVisibility: .visible) {
             Button(model.isDemo ? "Exit demo" : "Sign out", role: .destructive) { Task { await model.signOut() } }
         } message: {
-            if !model.isDemo { Text("This ends your Formatif session and removes your sign-in and cached data from this iPhone. You'll need to sign in with UNSW again.") }
+            if !model.isDemo {
+                Text("This ends your Formatif session and clears your sign-in and cached data from this iPhone.")
+            }
         }
     }
 
     private var reminderFooter: String {
         let p = model.prefs
         let on = WaitTier.reminders.filter(p.bumpOn).map { Fmt.days(p.days($0)) }
-        let when = p.bumpAt.map { ", at the next \(Prefs.clock($0)) once that much time has passed" } ?? ""
-        let list = on.isEmpty ? "Reminders are off." : "Marker nudges you when a submission has waited \(ListFormatter.localizedString(byJoining: on)) without feedback\(when)."
-        return list + " Marker schedules them on this iPhone, so they work without background refresh and stop once you set a status. The inbox tags and the waiting filter use the same days."
+        guard !on.isEmpty else { return "Reminders are off." }
+        let at = p.bumpAt.map { ", at the next \(Prefs.clock($0))" } ?? ""
+        return "Marker reminds you when a submission has waited \(ListFormatter.localizedString(byJoining: on)) without feedback\(at). "
+            + "They're scheduled on this iPhone and stop once you set a status. Inbox tags and the waiting filter use the same days."
     }
 
-    // DatePicker wants a Date, prefs store minutes after midnight.
+    // prefs keep minutes after midnight, DatePicker wants a Date
     private func clock(_ minutes: Binding<Int>) -> Binding<Date> {
-        Binding(get: { Calendar.current.date(bySettingHour: minutes.wrappedValue / 60, minute: minutes.wrappedValue % 60, second: 0, of: .now) ?? .now },
-                set: { d in
-                    let c = Calendar.current.dateComponents([.hour, .minute], from: d)
-                    minutes.wrappedValue = (c.hour ?? 0) * 60 + (c.minute ?? 0)
-                })
+        Binding(get: {
+            let m = minutes.wrappedValue
+            return Calendar.current.date(bySettingHour: m / 60, minute: m % 60, second: 0, of: .now) ?? .now
+        }, set: { d in
+            let c = Calendar.current.dateComponents([.hour, .minute], from: d)
+            minutes.wrappedValue = (c.hour ?? 0) * 60 + (c.minute ?? 0)
+        })
     }
 
-    static func hours(_ h: Int) -> String {
+    private static func hours(_ h: Int) -> String {
         if h % 24 == 0 { return h == 24 ? "1 day" : "\(h / 24) days" }
         return h == 1 ? "1 hour" : "\(h) hours"
     }
@@ -216,21 +229,27 @@ struct CSVExportsView: View {
 }
 
 struct AboutView: View {
+    private let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0"
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 MarkerLogo(size: 56)
                 Text("Marker").font(.title.bold())
-                Text("Version \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "1.0")")
-                    .font(.subheadline).foregroundStyle(Palette.fg2)
-                Group {
-                    Text("Marker is an unofficial tutor client for Formatif, UNSW CSE's fork of Doubtfire. It isn't made or endorsed by UNSW.")
-                    Text("Privacy").font(.headline)
-                    Text("Marker only talks to formatif.cse.unsw.edu.au. You sign in on Microsoft's own page, so Marker never sees your password. Your Formatif session token stays in the iOS Keychain on this iPhone, and your inbox and student list are cached here so the app opens straight away, even offline. Marker has no server of its own and no analytics or tracking.")
-                    Text("Side effects in Formatif").font(.headline)
-                    Text("Opening a comment thread marks it as read. Opening a submission shows up as “submission opened” in Formatif's marking analytics. Status changes and comments go to Formatif as soon as you tap them.")
-                }
-                .font(.body)
+                Text("Version \(version)").font(.subheadline).foregroundStyle(Palette.fg2)
+                Text("Marker is an unofficial tutor client for Formatif, UNSW CSE's fork of Doubtfire. It isn't made or endorsed by UNSW.")
+                Text("Privacy").font(.headline)
+                Text("""
+                    You sign in on Microsoft's own page, so Marker never sees your password. Apart from that page, \
+                    Marker only talks to formatif.cse.unsw.edu.au. Your session token stays in the iOS Keychain, and \
+                    your inbox and student list are cached on this iPhone so the app opens straight away, even offline. \
+                    There's no Marker server and no analytics or tracking.
+                    """)
+                Text("Side effects in Formatif").font(.headline)
+                Text("""
+                    Opening a comment thread marks it as read. Opening a submission shows up as “submission opened” \
+                    in Formatif's marking analytics. Status changes and comments go to Formatif as soon as you tap them.
+                    """)
             }
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -245,7 +264,7 @@ struct WeekdayPicker: View {
 
     var body: some View {
         let cal = Calendar.current
-        let order = [2, 3, 4, 5, 6, 7, 1] // Monday first
+        let order = [2, 3, 4, 5, 6, 7, 1] // monday first
         VStack(alignment: .leading, spacing: 8) {
             Text("Days")
             HStack(spacing: 6) {

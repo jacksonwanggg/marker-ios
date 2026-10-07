@@ -8,7 +8,7 @@ enum Fmt {
         return n == 1 ? "1 day" : "\(n) days"
     }
 
-    /// Parses Formatif timestamps ("2026-09-14T07:24:04.146Z") and dates ("2026-10-02").
+    // "2026-09-14T07:24:04.146Z" or "2026-10-02"
     static func parse(_ s: String?) -> Date? {
         guard let s, !s.isEmpty else { return nil }
         if let d = try? Date(s, strategy: Date.ISO8601FormatStyle(includingFractionalSeconds: true)) { return d }
@@ -17,7 +17,7 @@ enum Fmt {
         return nil
     }
 
-    /// "now", "5m", "2h", "Yesterday", "3d", "12 Sep".
+    // "now", "5m", "2h", "Yesterday", "3d", "12 Sep"
     static func relative(_ date: Date?, now: Date = .now) -> String {
         guard let date else { return "" }
         let secs = now.timeIntervalSince(date)
@@ -40,7 +40,6 @@ enum Fmt {
         return date.formatted(.dateTime.weekday(.abbreviated).day().month(.abbreviated))
     }
 
-    /// Thread times: "08:05" today, "Mon 08:05" this week, "7 Oct 08:05" otherwise.
     static func thread(_ date: Date?, now: Date = .now) -> String {
         guard let date else { return "" }
         if Calendar.current.isDateInToday(date) { return date.formatted(.dateTime.hour().minute()) }

@@ -1,9 +1,6 @@
 import Foundation
 
-/// LiveBackend talks to Formatif and DemoBackend fakes it.
 protocol MarkerBackend: Sendable {
-    var isDemo: Bool { get }
-
     func unitRoles() async throws -> [UnitRole]
     func unit(_ id: Int) async throws -> UnitDetail
     func students(unitID: Int) async throws -> [ProjectSummary]
@@ -12,7 +9,7 @@ protocol MarkerBackend: Sendable {
     func project(_ id: Int) async throws -> ProjectDetail
     func prerequisites(unitID: Int) async throws -> [Prerequisite]
 
-    // Formatif counts these three reads as marking activity.
+    // Formatif counts these three reads as marking activity
     func submissionDetails(_ key: TaskKey) async throws -> SubmissionDetails
     func submissionPDF(_ key: TaskKey) async throws -> Data
     func submissionFiles(_ key: TaskKey) async throws -> FileBundle?
@@ -21,7 +18,7 @@ protocol MarkerBackend: Sendable {
     func taskSheet(unitID: Int, taskDefID: Int) async throws -> Data
     func taskResources(unitID: Int, taskDefID: Int) async throws -> FileBundle?
 
-    /// Marks the thread as read, so only call it when the tutor opens comments.
+    // also marks the thread as read
     func comments(_ key: TaskKey) async throws -> [Comment]
     func postComment(_ key: TaskKey, text: String, replyTo: Int?) async throws -> Comment
     func postAttachment(_ key: TaskKey, filename: String, mimeType: String, data: Data) async throws -> Comment
@@ -41,39 +38,36 @@ protocol MarkerBackend: Sendable {
 }
 
 struct SignedOutBackend: MarkerBackend {
-    var isDemo: Bool { false }
-    private func no<T>() throws -> T { throw APIError.notSignedIn }
-    func unitRoles() async throws -> [UnitRole] { try no() }
-    func unit(_ id: Int) async throws -> UnitDetail { try no() }
-    func students(unitID: Int) async throws -> [ProjectSummary] { try no() }
-    func inbox(unitID: Int, myStudentsOnly: Bool) async throws -> [TaskSummary] { try no() }
-    func explorer(unitID: Int, taskDefID: Int) async throws -> [TaskSummary] { try no() }
-    func project(_ id: Int) async throws -> ProjectDetail { try no() }
-    func prerequisites(unitID: Int) async throws -> [Prerequisite] { try no() }
-    func submissionDetails(_ key: TaskKey) async throws -> SubmissionDetails { try no() }
-    func submissionPDF(_ key: TaskKey) async throws -> Data { try no() }
-    func submissionFiles(_ key: TaskKey) async throws -> FileBundle? { try no() }
+    func unitRoles() async throws -> [UnitRole] { throw APIError.notSignedIn }
+    func unit(_ id: Int) async throws -> UnitDetail { throw APIError.notSignedIn }
+    func students(unitID: Int) async throws -> [ProjectSummary] { throw APIError.notSignedIn }
+    func inbox(unitID: Int, myStudentsOnly: Bool) async throws -> [TaskSummary] { throw APIError.notSignedIn }
+    func explorer(unitID: Int, taskDefID: Int) async throws -> [TaskSummary] { throw APIError.notSignedIn }
+    func project(_ id: Int) async throws -> ProjectDetail { throw APIError.notSignedIn }
+    func prerequisites(unitID: Int) async throws -> [Prerequisite] { throw APIError.notSignedIn }
+    func submissionDetails(_ key: TaskKey) async throws -> SubmissionDetails { throw APIError.notSignedIn }
+    func submissionPDF(_ key: TaskKey) async throws -> Data { throw APIError.notSignedIn }
+    func submissionFiles(_ key: TaskKey) async throws -> FileBundle? { throw APIError.notSignedIn }
     func regeneratePDF(_ key: TaskKey) async throws { throw APIError.notSignedIn }
-    func taskSheet(unitID: Int, taskDefID: Int) async throws -> Data { try no() }
-    func taskResources(unitID: Int, taskDefID: Int) async throws -> FileBundle? { try no() }
-    func comments(_ key: TaskKey) async throws -> [Comment] { try no() }
-    func postComment(_ key: TaskKey, text: String, replyTo: Int?) async throws -> Comment { try no() }
-    func postAttachment(_ key: TaskKey, filename: String, mimeType: String, data: Data) async throws -> Comment { try no() }
+    func taskSheet(unitID: Int, taskDefID: Int) async throws -> Data { throw APIError.notSignedIn }
+    func taskResources(unitID: Int, taskDefID: Int) async throws -> FileBundle? { throw APIError.notSignedIn }
+    func comments(_ key: TaskKey) async throws -> [Comment] { throw APIError.notSignedIn }
+    func postComment(_ key: TaskKey, text: String, replyTo: Int?) async throws -> Comment { throw APIError.notSignedIn }
+    func postAttachment(_ key: TaskKey, filename: String, mimeType: String, data: Data) async throws -> Comment { throw APIError.notSignedIn }
     func deleteComment(_ key: TaskKey, id: Int) async throws { throw APIError.notSignedIn }
-    func commentAttachment(_ key: TaskKey, id: Int) async throws -> DownloadedFile { try no() }
+    func commentAttachment(_ key: TaskKey, id: Int) async throws -> DownloadedFile { throw APIError.notSignedIn }
     func assessExtension(_ key: TaskKey, commentID: Int, granted: Bool) async throws { throw APIError.notSignedIn }
     func setStatus(_ key: TaskKey, trigger: TaskStatus, grade: Int?, qualityPts: Int) async throws { throw APIError.notSignedIn }
     func setPinned(taskID: Int, pinned: Bool) async throws { throw APIError.notSignedIn }
-    func staffNotes(projectID: Int) async throws -> [StaffNote] { try no() }
-    func addStaffNote(projectID: Int, text: String) async throws -> StaffNote { try no() }
+    func staffNotes(projectID: Int) async throws -> [StaffNote] { throw APIError.notSignedIn }
+    func addStaffNote(projectID: Int, text: String) async throws -> StaffNote { throw APIError.notSignedIn }
     func deleteStaffNote(projectID: Int, id: Int) async throws { throw APIError.notSignedIn }
-    func csv(unitID: Int, report: CSVReport) async throws -> DownloadedFile { try no() }
+    func csv(unitID: Int, report: CSVReport) async throws -> DownloadedFile { throw APIError.notSignedIn }
     func signOut() async {}
 }
 
 struct LiveBackend: MarkerBackend {
     let client: FormatifClient
-    var isDemo: Bool { false }
 
     private func base(_ k: TaskKey) -> String { "projects/\(k.projectID)/task_def_id/\(k.taskDefID)" }
     private let inline = [URLQueryItem(name: "as_attachment", value: "false")]

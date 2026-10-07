@@ -9,7 +9,6 @@ enum LiveData {
 
     static func data(_ name: String) throws -> Data { try Data(contentsOf: dir!.appendingPathComponent(name)) }
     static func decode<T: Decodable>(_ t: T.Type, _ name: String) throws -> T { try JSON.decoder().decode(T.self, from: data(name)) }
-    /// Same lenient list decoding as LiveBackend.
     static func list<T: Decodable & Sendable>(_ t: T.Type, _ name: String) throws -> [T] { try decode(LossyList<T>.self, name).items }
     static func files(prefix: String) -> [String] {
         ((try? FileManager.default.contentsOfDirectory(atPath: dir!.path)) ?? []).filter { $0.hasPrefix(prefix) }.sorted()
@@ -17,7 +16,6 @@ enum LiveData {
 }
 
 struct FileBackend: MarkerBackend {
-    var isDemo: Bool { false }
     private func no<T>() throws -> T { throw APIError.badResponse("not in the saved responses") }
     func unitRoles() async throws -> [UnitRole] { try LiveData.list(UnitRole.self, "unit_roles.json") }
     func unit(_ id: Int) async throws -> UnitDetail { try LiveData.decode(UnitDetail.self, "unit.json") }
@@ -25,10 +23,14 @@ struct FileBackend: MarkerBackend {
     func inbox(unitID: Int, myStudentsOnly: Bool) async throws -> [TaskSummary] {
         try LiveData.list(TaskSummary.self, myStudentsOnly ? "inbox_mine.json" : "inbox_all.json")
     }
-    func explorer(unitID: Int, taskDefID: Int) async throws -> [TaskSummary] { try LiveData.list(TaskSummary.self, "explorer_\(taskDefID).json") }
+    func explorer(unitID: Int, taskDefID: Int) async throws -> [TaskSummary] {
+        try LiveData.list(TaskSummary.self, "explorer_\(taskDefID).json")
+    }
     func project(_ id: Int) async throws -> ProjectDetail { try LiveData.decode(ProjectDetail.self, "project_\(id).json") }
     func prerequisites(unitID: Int) async throws -> [Prerequisite] { try LiveData.list(Prerequisite.self, "prereqs.json") }
-    func submissionDetails(_ key: TaskKey) async throws -> SubmissionDetails { try LiveData.decode(SubmissionDetails.self, "submission_details.json") }
+    func submissionDetails(_ key: TaskKey) async throws -> SubmissionDetails {
+        try LiveData.decode(SubmissionDetails.self, "submission_details.json")
+    }
     func submissionPDF(_ key: TaskKey) async throws -> Data { try no() }
     func submissionFiles(_ key: TaskKey) async throws -> FileBundle? { try no() }
     func regeneratePDF(_ key: TaskKey) async throws { throw APIError.notSignedIn }
@@ -52,7 +54,7 @@ struct FileBackend: MarkerBackend {
 @MainActor
 @Suite(.enabled(if: LiveData.dir != nil), .serialized)
 struct LiveDataTests {
-    @Test func picksTheCurrentUnitAndMyTutorial() async throws {
+    @Test func picksUnitAndTutorial() async throws {
         let model = AppModel()
         await model.startForTesting(FileBackend(), credentials: nil)
         #expect(model.unitRoles.count >= 1)
@@ -68,7 +70,7 @@ struct LiveDataTests {
         #expect(labels.count == model.unitRoles.count, "every unit role has a distinct label: \(labels.sorted())")
     }
 
-    @Test func inboxRowsResolveNamesAndTasks() async throws {
+    @Test func inboxRowsResolve() async throws {
         let model = AppModel()
         await model.startForTesting(FileBackend(), credentials: nil)
         let mine = try LiveData.list(TaskSummary.self, "inbox_mine.json")
@@ -107,7 +109,7 @@ struct LiveDataTests {
         #expect(all.allSatisfy { !model.lookup.title($0).hasPrefix("A student") || model.projects[$0.projectId] == nil })
     }
 
-    @Test func explorerProjectsNotesAndPrereqsDecode() throws {
+    @Test func savedResponsesDecode() throws {
         for f in LiveData.files(prefix: "explorer_") {
             let rows = try LiveData.list(TaskSummary.self, f)
             #expect(rows.allSatisfy { $0.tutorialId != nil }, "\(f): explorer rows carry a tutorial")
@@ -123,7 +125,7 @@ struct LiveDataTests {
         #expect(!prereqs.isEmpty)
     }
 
-    @Test func processingPDFIsNotShownAsMissing() async throws {
+    @Test func processingPDF() async throws {
         let details = try LiveData.decode(SubmissionDetails.self, "submission_details.json")
         let model = AppModel()
         await model.startForTesting(FileBackend(), credentials: nil)
@@ -139,7 +141,7 @@ struct LiveDataTests {
     }
 
     @Test(.enabled(if: LiveData.captures != nil))
-    func capturedCommentThreadsDecode() throws {
+    func capturedComments() throws {
         var count = 0, kinds = Set<String>()
         for name in ["probe1.json", "probe2.json", "probe3.json"] {
             let url = LiveData.captures!.appendingPathComponent(name)

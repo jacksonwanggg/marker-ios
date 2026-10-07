@@ -90,7 +90,8 @@ struct StudentDetailView: View {
 
     private var tasks: [TaskSummary] {
         guard let project else { return [] }
-        let order = Dictionary((model.unit?.taskDefinitions ?? []).enumerated().map { ($1.id, $0) }, uniquingKeysWith: { a, _ in a })
+        let defs = model.unit?.taskDefinitions ?? []
+        let order = Dictionary(defs.enumerated().map { ($1.id, $0) }, uniquingKeysWith: { a, _ in a })
         return project.tasks
             .sorted { (order[$0.taskDefinitionId] ?? .max) < (order[$1.taskDefinitionId] ?? .max) }
             .map { model.applying(TaskSummary(projectID: project.id, task: $0), fetchedAt: fetchedAt) }

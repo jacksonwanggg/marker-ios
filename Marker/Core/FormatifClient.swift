@@ -24,7 +24,6 @@ enum RequestBody: Sendable {
     case multipart(Multipart)
 }
 
-/// On a 401 or 419 the client refreshes the token once and retries.
 actor FormatifClient {
     static let host = "formatif.cse.unsw.edu.au"
     static let api = URL(string: "https://formatif.cse.unsw.edu.au/api")!
@@ -63,10 +62,10 @@ actor FormatifClient {
 
     func send(_ method: String, _ path: String, query: [URLQueryItem] = [], body: RequestBody = .none) async throws -> (Data, HTTPURLResponse) {
         guard let creds = credentials else { throw APIError.notSignedIn }
-        let (data, resp) = try await perform(method, path, query, body, creds)
+        let (data, resp) = try await request(method, path, query, body, creds)
         if resp.statusCode == 419 || resp.statusCode == 401 {
             let fresh = try await refreshShared(failedToken: creds.authToken)
-            let (d2, r2) = try await perform(method, path, query, body, fresh)
+            let (d2, r2) = try await request(method, path, query, body, fresh)
             try Self.check(d2, r2)
             return (d2, r2)
         }
@@ -97,7 +96,8 @@ actor FormatifClient {
         return DownloadedFile(data: data, filename: name, mimeType: resp.mimeType)
     }
 
-    private func perform(_ method: String, _ path: String, _ query: [URLQueryItem], _ body: RequestBody, _ creds: Credentials) async throws -> (Data, HTTPURLResponse) {
+    private func request(_ method: String, _ path: String, _ query: [URLQueryItem], _ body: RequestBody,
+                         _ creds: Credentials) async throws -> (Data, HTTPURLResponse) {
         #if DEBUG
         if Self.qaReadOnly, let reason = Self.qaBlockReason(method, path) {
             throw APIError.http(0, "Blocked in QA read-only mode: \(reason).")
@@ -127,7 +127,9 @@ actor FormatifClient {
         guard resp.statusCode >= 400 else { return }
         let msg = errorMessage(data)
         if resp.statusCode == 403, msg.lowercased().contains("duplicate") { throw APIError.duplicate(msg) }
-        if resp.statusCode == 419 || resp.statusCode == 401 { throw APIError.http(resp.statusCode, msg.isEmpty ? "Formatif didn't accept your sign-in." : msg) }
+        if resp.statusCode == 419 || resp.statusCode == 401 {
+            throw APIError.http(resp.statusCode, msg.isEmpty ? "Formatif didn't accept your sign-in." : msg)
+        }
         throw APIError.http(resp.statusCode, msg)
     }
 
@@ -141,8 +143,6 @@ actor FormatifClient {
     }
 
     #if DEBUG
-    /// QA read-only mode. Blocks writes and the reads with side effects: fetching
-    /// comments marks them read, and submission reads count as marking activity.
     static var qaReadOnly: Bool { ProcessInfo.processInfo.environment["MARKER_QA_READONLY"] == "1" }
 
     static func qaBlockReason(_ method: String, _ path: String) -> String? {
@@ -212,14 +212,14 @@ actor FormatifClient {
 
     func signOut() async {
         if let c = credentials {
-            _ = try? await perform("DELETE", "auth", [URLQueryItem(name: "remember", value: "false")], .none, c)
+            _ = try? await request("DELETE", "auth", [URLQueryItem(name: "remember", value: "false")], .none, c)
         }
         expire()
     }
 
     // MARK: sign-in
 
-    /// Fetched fresh each time because the SAML request changes.
+    // not cached, the SAML request changes each time
     static func signInURL() async throws -> URL {
         var req = URLRequest(url: url("auth/method"))
         req.setValue("application/json", forHTTPHeaderField: "Accept")

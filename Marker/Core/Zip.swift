@@ -41,7 +41,7 @@ enum ZipError: LocalizedError {
     var errorDescription: String? { "That file isn't a zip archive." }
 }
 
-/// Small zip reader (stored and deflate only) so we don't need a library.
+// minimal reader, stored and deflate only
 enum Zip {
     static func entries(_ data: Data) throws -> [ZipEntry] {
         let b = [UInt8](data)

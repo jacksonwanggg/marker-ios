@@ -1,18 +1,19 @@
 import Foundation
 import UIKit
 
-/// Demo mode. Every student and submission is made up, and changes only live in memory.
 actor DemoBackend: MarkerBackend {
-    nonisolated var isDemo: Bool { true }
+    static let me = UserRef(id: 1, firstName: "Alex", lastName: "Tutor", username: "z5123456")
 
-    static let me = UserRef(id: 1, firstName: "Alex", lastName: "Tutor", email: nil, username: "z5123456", nickname: nil)
-
-    private struct DemoStudent { let sid: Int; let first: String; let last: String; let zid: String; let tut: Int; let target: Int }
+    private struct DemoStudent { let sid: Int, first: String, last: String, zid: String, tut: Int, target: Int }
     private static let tutorials: [Tutorial] = [
-        Tutorial(id: 11, abbreviation: "T13A", meetingDay: "Tuesday", meetingTime: "13:00", meetingLocation: "Quad G040", tutorId: 1, numStudents: 6),
-        Tutorial(id: 12, abbreviation: "H14B", meetingDay: "Thursday", meetingTime: "14:00", meetingLocation: "Ainsworth 101", tutorId: 1, numStudents: 4),
-        Tutorial(id: 13, abbreviation: "W11A", meetingDay: "Wednesday", meetingTime: "11:00", meetingLocation: "Law 203", tutorId: 2, numStudents: 1),
-        Tutorial(id: 14, abbreviation: "F09B", meetingDay: "Friday", meetingTime: "09:00", meetingLocation: "Online", tutorId: 3, numStudents: 1),
+        Tutorial(id: 11, abbreviation: "T13A", meetingDay: "Tuesday", meetingTime: "13:00",
+                 meetingLocation: "Quad G040", tutorId: 1, numStudents: 6),
+        Tutorial(id: 12, abbreviation: "H14B", meetingDay: "Thursday", meetingTime: "14:00",
+                 meetingLocation: "Ainsworth 101", tutorId: 1, numStudents: 4),
+        Tutorial(id: 13, abbreviation: "W11A", meetingDay: "Wednesday", meetingTime: "11:00",
+                 meetingLocation: "Law 203", tutorId: 2, numStudents: 1),
+        Tutorial(id: 14, abbreviation: "F09B", meetingDay: "Friday", meetingTime: "09:00",
+                 meetingLocation: "Online", tutorId: 3, numStudents: 1),
     ]
     private static let roster: [DemoStudent] = [
         .init(sid: 1, first: "Priya", last: "Raman", zid: "z5401234", tut: 11, target: 3),
@@ -33,7 +34,7 @@ actor DemoBackend: MarkerBackend {
         func td(_ id: Int, _ abbr: String, _ name: String, _ grade: Int, dueIn days: Double, _ desc: String) -> TaskDefinition {
             TaskDefinition(id: id, abbreviation: abbr, name: name, description: desc,
                            targetGrade: grade, dueDate: day(Date.now.addingTimeInterval(days * 86_400)),
-                           targetDate: nil, startDate: day(start), hasTaskSheet: true, hasTaskResources: id == 5,
+                           startDate: day(start), hasTaskSheet: true, hasTaskResources: id == 5,
                            isGraded: false, maxQualityPts: 0, discussionPromptsCount: 0)
         }
         return [
@@ -94,11 +95,10 @@ actor DemoBackend: MarkerBackend {
             t(12, 4, .readyForFeedback, 24),
         ]
         threads = Self.seedThreads(now: now)
-        notes = [Self.projectID(1): [StaffNote(id: 1, note: "Asked about a reference letter in week 5. Follow up once term's over.",
-                                               createdAt: ago(48), updatedAt: nil, replyToId: nil, userId: 1)]]
+        let note = StaffNote(id: 1, note: "Asked about a reference letter in week 5. Follow up once term's over.",
+                             createdAt: ago(48), userId: 1)
+        notes = [Self.projectID(1): [note]]
     }
-
-    // MARK: ids and helpers
 
     private static func taskID(_ sid: Int, _ td: Int) -> Int { 10_000 + sid * 100 + td }
     private static func projectID(_ sid: Int) -> Int { 500 + sid }
@@ -107,7 +107,7 @@ actor DemoBackend: MarkerBackend {
     private static func day(_ d: Date) -> String { d.formatted(Date.ISO8601FormatStyle().year().month().day()) }
     private static func user(_ sid: Int) -> UserRef {
         let s = roster[sid - 1]
-        return UserRef(id: 100 + sid, firstName: s.first, lastName: s.last, email: nil, username: s.zid, nickname: nil)
+        return UserRef(id: 100 + sid, firstName: s.first, lastName: s.last, username: s.zid)
     }
 
     private static func seedThreads(now: Date) -> [TaskKey: [Comment]] {
@@ -121,10 +121,11 @@ actor DemoBackend: MarkerBackend {
             return Comment(id: id, comment: text, hasAttachment: attach, type: type, isNew: false, replyToId: replyTo,
                            author: mine ? me : student, recipient: mine ? student : me, createdAt: at(hours),
                            recipientReadTime: read.map { at($0) }, status: status?.rawValue,
-                           assessed: weeks == nil ? nil : false, granted: nil, dateAssessed: nil, weeksRequested: weeks)
+                           assessed: weeks == nil ? nil : false, weeksRequested: weeks)
         }
         var out: [TaskKey: [Comment]] = [:]
-        let reply = c(1, "text", "Having both is fine. OPT(0) = 0 is enough on its own, but the extra one doesn't hurt.", 1.6, mine: true, read: 1.5)
+        let reply = c(1, "text", "Having both is fine. OPT(0) = 0 is enough on its own, but the extra one doesn't hurt.", 1.6,
+                      mine: true, read: 1.5)
         out[key(1, 5)] = [
             c(1, "status", nil, 2, status: .readyForFeedback),
             c(1, "text", "Hi, does the recurrence need a base case for n = 1 as well as n = 0? I put both in just in case.", 1.95),
@@ -133,7 +134,7 @@ actor DemoBackend: MarkerBackend {
         ]
         out[key(5, 4)] = [
             c(5, "status", nil, 27, status: .needHelp),
-            c(5, "text", "I'm stuck on the exchange step. I swap the first interval in OPT for the greedy one but can't show the new schedule still has no overlaps. Any hints?", 26.9),
+            c(5, "text", "I'm stuck on the exchange step, can't show there are still no overlaps after the swap. Any hints?", 26.9),
             c(5, "text", "also can I assume the intervals are already sorted by finish time?", 26.5),
         ]
         out[key(6, 2)] = [
@@ -142,7 +143,8 @@ actor DemoBackend: MarkerBackend {
         ]
         out[key(10, 3)] = [
             c(10, "status", nil, 110, status: .readyForFeedback),
-            c(10, "text", "The regularity condition is for case 3, not case 2. Have a look at section 2 of the task sheet.", 100, mine: true, read: 80),
+            c(10, "text", "The regularity condition is for case 3, not case 2. Have a look at section 2 of the task sheet.", 100,
+              mine: true, read: 80),
             c(10, "status", nil, 99.9, mine: true, status: .fixAndResubmit),
             c(10, "text", "Ah I had 2 and 3 mixed up. Fixed and resubmitted.", 77.2),
             c(10, "pdf", nil, 77.1, attach: true),
@@ -154,6 +156,25 @@ actor DemoBackend: MarkerBackend {
         ]
         out[key(4, 5)] = [c(4, "text", "Is it ok to use memoisation instead of filling the table bottom up?", 8)]
         return out
+    }
+
+    static func feed(now: Date) -> [AlertEvent] {
+        func key(_ sid: Int, _ td: Int) -> TaskKey { TaskKey(projectID: projectID(sid), taskDefID: td) }
+        func ago(_ hours: Double) -> Date { now.addingTimeInterval(-hours * 3600) }
+        return [
+            AlertEvent(id: "e1", kind: .newWork, title: "Priya Raman · 3.2 · (W) Dynamic programming",
+                       body: "Ready for feedback.", date: ago(2), key: key(1, 5), openComments: false, seen: false),
+            AlertEvent(id: "e2", kind: .comment, title: "Tom Okafor · 3.1 · (W) Greedy exchange argument",
+                       body: "1 new comment.", date: ago(3), key: key(2, 4), openComments: true, seen: false),
+            AlertEvent(id: "e3", kind: .comment, title: "Daniel Kowalski · 3.2 · (W) Dynamic programming",
+                       body: "1 new comment.", date: ago(8), key: key(4, 5), openComments: true, seen: false),
+            AlertEvent(id: "e4", kind: .resubmission, title: "Daniel Kowalski · 2.2 · (W) Master theorem",
+                       body: "Resubmitted. Ready for feedback.", date: ago(26), key: key(4, 3), openComments: false, seen: true),
+            AlertEvent(id: "e5", kind: .comment, title: "Aisha Rahman · 3.1 · (W) Greedy exchange argument",
+                       body: "2 new comments.", date: ago(27), key: key(5, 4), openComments: true, seen: true),
+            AlertEvent(id: "e6", kind: .extensionRequest, title: "Lucas Ferreira · 2.1 · (W) Divide and conquer",
+                       body: "Grant or deny it in the thread.", date: ago(51), key: key(6, 2), openComments: true, seen: true),
+        ]
     }
 
     private func derived(_ sid: Int, _ td: Int) -> TaskSummary {
@@ -191,7 +212,7 @@ actor DemoBackend: MarkerBackend {
         guard t.status.isSubmitted else { return [] }
         let sid = Self.sid(ofProject: key.projectID)
         return [Comment(id: 800_000 + t.id, comment: nil, hasAttachment: false, type: "status", isNew: false, replyToId: nil,
-                        author: Self.user(sid), recipient: Self.me, createdAt: t.submissionDate, recipientReadTime: nil,
+                        author: Self.user(sid), recipient: Self.me, createdAt: t.submissionDate,
                         status: TaskStatus.readyForFeedback.rawValue)]
     }
 
@@ -201,10 +222,13 @@ actor DemoBackend: MarkerBackend {
     // MARK: MarkerBackend
 
     func unitRoles() async throws -> [UnitRole] {
-        [
-            UnitRole(id: 1, role: "Tutor", unit: UnitSummary(id: 1, code: "COMP3121/9101", name: "Algorithm Design and Analysis", myRole: "Tutor", startDate: "2026-09-14", endDate: "2026-12-12", active: true), user: Self.me),
-            UnitRole(id: 2, role: "Tutor", unit: UnitSummary(id: 2, code: "COMP9020", name: "Foundations of Computer Science", myRole: "Tutor", startDate: "2026-09-14", endDate: "2026-12-12", active: true), user: Self.me),
+        let units = [
+            UnitSummary(id: 1, code: "COMP3121/9101", name: "Algorithm Design and Analysis", myRole: "Tutor",
+                        startDate: "2026-09-14", endDate: "2026-12-12", active: true),
+            UnitSummary(id: 2, code: "COMP9020", name: "Foundations of Computer Science", myRole: "Tutor",
+                        startDate: "2026-09-14", endDate: "2026-12-12", active: true),
         ]
+        return units.map { UnitRole(id: $0.id, role: "Tutor", unit: $0, user: Self.me) }
     }
 
     func unit(_ id: Int) async throws -> UnitDetail {
@@ -222,7 +246,7 @@ actor DemoBackend: MarkerBackend {
         guard unitID == 1 else { return [] }
         return Self.roster.map { s in
             ProjectSummary(id: Self.projectID(s.sid),
-                           student: Student(id: 100 + s.sid, studentId: s.zid, username: s.zid, email: nil, firstName: s.first, lastName: s.last, nickname: nil),
+                           student: Student(id: 100 + s.sid, studentId: s.zid, username: s.zid, firstName: s.first, lastName: s.last),
                            targetGrade: s.target, tutorialEnrolments: [TutorialEnrolment(tutorialId: s.tut, streamAbbr: "Lab")],
                            staffNoteCount: notes[Self.projectID(s.sid)]?.count ?? 0)
         }
@@ -377,7 +401,7 @@ actor DemoBackend: MarkerBackend {
 
     func addStaffNote(projectID: Int, text: String) async throws -> StaffNote {
         await pause()
-        let n = StaffNote(id: newID(), note: text, createdAt: Self.iso(.now), updatedAt: nil, replyToId: nil, userId: Self.me.id)
+        let n = StaffNote(id: newID(), note: text, createdAt: Self.iso(.now), userId: Self.me.id)
         notes[projectID, default: []].insert(n, at: 0)
         return n
     }
@@ -430,7 +454,8 @@ enum DemoContent {
         return UIGraphicsPDFRenderer(bounds: page).pdfData { ctx in
             func draw(_ s: String, _ font: UIFont, _ color: UIColor, _ y: inout CGFloat) {
                 let attr = NSAttributedString(string: s, attributes: [.font: font, .foregroundColor: color])
-                let rect = attr.boundingRect(with: CGSize(width: 483, height: CGFloat.greatestFiniteMagnitude), options: [.usesLineFragmentOrigin], context: nil)
+                let rect = attr.boundingRect(with: CGSize(width: 483, height: CGFloat.greatestFiniteMagnitude),
+                                             options: [.usesLineFragmentOrigin], context: nil)
                 attr.draw(with: CGRect(x: 56, y: y, width: 483, height: rect.height), options: [.usesLineFragmentOrigin], context: nil)
                 y += rect.height + 12
             }

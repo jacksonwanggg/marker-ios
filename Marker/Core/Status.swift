@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Formatif's task statuses (Doubtfire STATUS_KEYS plus the older do_not_resubmit).
+// Doubtfire's STATUS_KEYS plus the older do_not_resubmit
 enum TaskStatus: String, CaseIterable, Codable, Sendable, Identifiable {
     case notStarted = "not_started"
     case workingOnIt = "working_on_it"
@@ -22,9 +22,7 @@ enum TaskStatus: String, CaseIterable, Codable, Sendable, Identifiable {
 
     init(key: String?) { self = TaskStatus(rawValue: key ?? "") ?? .notStarted }
 
-    /// The six buttons along the bottom of a task.
     static let triggers: [TaskStatus] = [.complete, .fixAndResubmit, .redo, .discuss, .attentionRequired, .demonstrate]
-    /// Less common statuses, set from the task menu.
     static let more: [TaskStatus] = [.feedbackExceeded, .fail, .timeExceeded]
 
     var label: String {
@@ -75,15 +73,14 @@ enum TaskStatus: String, CaseIterable, Codable, Sendable, Identifiable {
     }
 }
 
-/// How long a submission has waited for feedback.
-enum WaitTier: Int, Comparable, CaseIterable, Sendable {
+enum WaitTier: Int, Comparable, Sendable {
     case none = 0, first, second, third, overdue
 
     static func < (a: WaitTier, b: WaitTier) -> Bool { a.rawValue < b.rawValue }
 
     static let reminders: [WaitTier] = [.first, .second, .third, .overdue]
 
-    /// Position in `Prefs.bumpAfter`.
+    // position in Prefs.bumpAfter
     var index: Int { rawValue - 1 }
 
     static func of(status: TaskStatus, submitted: Date?, now: Date = .now, after: [Int] = Prefs.defaultBumpAfter) -> WaitTier {

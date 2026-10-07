@@ -1,4 +1,3 @@
-import QuickLook
 import SwiftUI
 import UIKit
 
@@ -103,7 +102,6 @@ struct SectionLabel: View {
     }
 }
 
-/// Empty or error message with an optional button.
 struct EmptyState: View {
     let title: String
     var detail: String?
@@ -113,7 +111,9 @@ struct EmptyState: View {
     var body: some View {
         VStack(spacing: 6) {
             Text(title).font(.headline)
-            if let detail { Text(detail).font(.subheadline).foregroundStyle(Palette.fg2).multilineTextAlignment(.center) }
+            if let detail {
+                Text(detail).font(.subheadline).foregroundStyle(Palette.fg2).multilineTextAlignment(.center)
+            }
             if let action, let perform {
                 Button(action, action: perform).font(.headline).padding(.top, 4).frame(minHeight: 44)
             }
@@ -185,7 +185,6 @@ struct ShareItem: Identifiable {
 }
 
 enum TempFiles {
-    /// Writes data to a temp file so QuickLook or the share sheet can open it.
     static func write(_ data: Data, name: String) -> URL? {
         let dir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
@@ -201,7 +200,6 @@ enum TempFiles {
 }
 
 extension View {
-    /// Hairline separators flush with the 16 pt margin.
     func markerRow() -> some View {
         listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
             .listRowSeparatorTint(Palette.hair)

@@ -3,10 +3,8 @@ import Testing
 import UserNotifications
 @testable import Marker
 
-// All test data here is made up.
-
 @Suite struct DecodeTests {
-    @Test func inboxRowAcceptsIntsForBools() throws {
+    @Test func decodesInboxRow() throws {
         let json = """
         [{"id":1,"project_id":2,"task_definition_id":3,"tutorial_id":4,"status":"ready_for_feedback",
           "completion_date":null,"submission_date":"2026-09-14T07:24:04.146Z","times_assessed":1,"grade":null,
@@ -34,7 +32,7 @@ import UserNotifications
         #expect(!rows[0].pinned)
     }
 
-    @Test func decodesEveryCommentKind() throws {
+    @Test func decodesCommentKinds() throws {
         let json = """
         [{"id":1,"comment":"","has_attachment":false,"type":"status","is_new":false,"reply_to_id":null,
           "author":{"id":10,"first_name":"Sam","last_name":"Lee","email":"x"},"recipient":{"id":20,"first_name":"Ana","last_name":"B","email":"y"},
@@ -53,8 +51,8 @@ import UserNotifications
         #expect(list[2].assessed == false)
     }
 
-    @Test func oneBadRecordDoesNotBlankTheList() throws {
-        // a null tutorial_id is fine, records that can't decode are skipped
+    @Test func skipsBadRecords() throws {
+        // a null tutorial_id only drops that enrolment
         let json = """
         [{"id":1,"student":{"id":2,"first_name":"A"},"tutorial_enrolments":[{"tutorial_id":null},{"tutorial_id":5}]},
          {"id":"oops","student":null},
@@ -113,16 +111,17 @@ import UserNotifications
     }
 }
 
+private func task(_ status: TaskStatus, id: Int = 1, taskDef: Int = 3, comments: Int = 0, ext: Bool = false,
+                  submitted: String? = "2026-10-01T00:00:00Z", assessed: Int = 0) -> TaskSummary {
+    TaskSummary(id: id, projectId: 2, taskDefinitionId: taskDef, tutorialId: 4, statusKey: status.rawValue, completionDate: nil,
+                submissionDate: submitted, timesAssessed: assessed, grade: nil, qualityPts: -1, numNewComments: comments,
+                similarityFlag: false, pinned: false, hasExtensions: ext)
+}
+
 @Suite struct NotificationTests {
     let lookup = Lookup(unitCode: "COMP0000", students: [2: "Ana B"], taskDefs: [3: "1.2 · (W) Grid"])
 
-    func task(_ status: TaskStatus, comments: Int = 0, ext: Bool = false, submitted: String = "2026-10-01T00:00:00Z", assessed: Int = 0) -> TaskSummary {
-        TaskSummary(id: 1, projectId: 2, taskDefinitionId: 3, tutorialId: 4, statusKey: status.rawValue, completionDate: nil,
-                    submissionDate: submitted, timesAssessed: assessed, grade: nil, qualityPts: -1, numNewComments: comments,
-                    similarityFlag: false, pinned: false, hasExtensions: ext)
-    }
-
-    @Test func summaryOnlyMentionsWhatsThere() {
+    @Test func summaryBody() {
         let r = Notifier.summaryRequest(inbox: [task(.readyForFeedback), task(.discuss, comments: 1)], lookup: lookup, prefs: Prefs())
         #expect(r?.content.body == "COMP0000: 1 waiting for feedback and 1 thread with unread comments.")
     }
@@ -131,7 +130,7 @@ import UserNotifications
         #expect(Notifier.diff(old: nil, new: [task(.readyForFeedback)], lookup: lookup).isEmpty)
     }
 
-    @Test func diffFindsNewWorkCommentsAndExtensions() {
+    @Test func diffEvents() {
         let a = Notifier.snapshot([task(.workingOnIt)])
         let events = Notifier.diff(old: a, new: [task(.readyForFeedback, comments: 2, ext: true)], lookup: lookup)
         #expect(events.map(\.kind) == [.newWork, .comment, .extensionRequest])
@@ -140,7 +139,7 @@ import UserNotifications
         #expect(events.allSatisfy { $0.key == TaskKey(projectID: 2, taskDefID: 3) })
     }
 
-    @Test func resubmissionAlertsButRepeatsDoNot() {
+    @Test func resubmissionAlerts() {
         let a = Notifier.snapshot([task(.readyForFeedback)])
         #expect(Notifier.diff(old: a, new: [task(.readyForFeedback)], lookup: lookup).isEmpty)
         let resub = Notifier.diff(old: a, new: [task(.readyForFeedback, submitted: "2026-10-03T00:00:00Z", assessed: 1)], lookup: lookup)
@@ -150,11 +149,8 @@ import UserNotifications
         #expect(read.isEmpty)
     }
 
-    @Test func badgeIsAwaitingPlusUnread() {
-        var other = task(.discuss, comments: 1)
-        other = TaskSummary(id: 2, projectId: 2, taskDefinitionId: 5, tutorialId: 4, statusKey: other.statusKey, completionDate: nil,
-                            submissionDate: nil, timesAssessed: 0, grade: nil, qualityPts: -1, numNewComments: 1,
-                            similarityFlag: false, pinned: false, hasExtensions: false)
+    @Test func badgeCount() {
+        let other = task(.discuss, id: 2, taskDef: 5, comments: 1, submitted: nil)
         #expect(Notifier.badgeCount([task(.readyForFeedback, comments: 1), other]) == 2)
     }
 }
@@ -162,7 +158,7 @@ import UserNotifications
 @Suite struct BumpTests {
     let lookup = Lookup(unitCode: "C", students: [:], taskDefs: [:])
 
-    @Test func waitTiersFollowReminderDays() {
+    @Test func waitTiers() {
         let now = Date(timeIntervalSince1970: 1_000_000_000)
         func at(_ days: Double) -> Date { now.addingTimeInterval(-days * 86_400) }
         #expect(WaitTier.of(status: .readyForFeedback, submitted: at(1.9), now: now) == .none)
@@ -171,32 +167,27 @@ import UserNotifications
         #expect(WaitTier.of(status: .readyForFeedback, submitted: at(4), now: now) == .third)
         #expect(WaitTier.of(status: .readyForFeedback, submitted: at(9), now: now) == .overdue)
         #expect(WaitTier.of(status: .readyForFeedback, submitted: at(5), now: now, after: [1, 5, 6, 10]) == .second)
+        #expect(WaitTier.of(status: .complete, submitted: at(9), now: now) == .none)
         #expect(WaitTier.third.tag(days: 6) == "Waiting 6 days")
         #expect(WaitTier.overdue.tag(days: 7) == "Overdue · 1 week, no feedback")
-        #expect(WaitTier.of(status: .complete, submitted: at(9), now: now) == .none)
         #expect(WaitTier.overdue.tag(days: 9) == "Overdue · 9 days, no feedback")
     }
 
-    @Test func schedulesOnlyFutureEnabledReminders() {
+    @Test func schedulesBumps() {
         let now = Date.now
-        let submitted = now.addingTimeInterval(-2.5 * 86_400)
-        let t = TaskSummary(id: 7, projectId: 1, taskDefinitionId: 1, tutorialId: nil, statusKey: "ready_for_feedback",
-                            completionDate: nil, submissionDate: submitted.formatted(Date.ISO8601FormatStyle()),
-                            timesAssessed: 0, grade: nil, qualityPts: -1, numNewComments: 0, similarityFlag: false,
-                            pinned: false, hasExtensions: false)
+        let submitted = now.addingTimeInterval(-2.5 * 86_400).formatted(Date.ISO8601FormatStyle())
+        let t = task(.readyForFeedback, id: 7, submitted: submitted)
         var prefs = Prefs()
         prefs.quietHours = false
         let ids = Notifier.bumpRequests(inbox: [t], lookup: lookup, prefs: prefs, now: now).map(\.identifier)
         #expect(ids == ["bump-7-3", "bump-7-4", "bump-7-7"])
         prefs.setBump(.third, false)
         #expect(Notifier.bumpRequests(inbox: [t], lookup: lookup, prefs: prefs, now: now).map(\.identifier) == ["bump-7-3", "bump-7-7"])
-        let done = TaskSummary(id: 7, projectId: 1, taskDefinitionId: 1, tutorialId: nil, statusKey: "complete", completionDate: nil,
-                               submissionDate: t.submissionDate, timesAssessed: 1, grade: nil, qualityPts: -1, numNewComments: 0,
-                               similarityFlag: false, pinned: false, hasExtensions: false)
+        let done = task(.complete, id: 7, submitted: submitted, assessed: 1)
         #expect(Notifier.bumpRequests(inbox: [done], lookup: lookup, prefs: prefs, now: now).isEmpty)
     }
 
-    @Test func quietHoursPushAlertsToEight() {
+    @Test func defaultQuietHours() {
         let cal = Calendar.current
         let prefs = Prefs()
         let late = cal.date(bySettingHour: 23, minute: 30, second: 0, of: Date.now)!
@@ -219,7 +210,6 @@ import UserNotifications
         #expect(!p.isQuiet(at(21, 29)))
         let moved = p.outOfQuiet(at(22))
         #expect(cal.component(.hour, from: moved) == 7 && moved > at(22))
-        // a daytime span that doesn't cross midnight
         p.quietFrom = 12 * 60
         p.quietUntil = 14 * 60
         #expect(p.isQuiet(at(13)) && !p.isQuiet(at(14)) && !p.isQuiet(at(11)))
@@ -238,8 +228,11 @@ import UserNotifications
         #expect(p.bumpAfter == [1, 26, 27, 28], "capped so the later ones still fit")
     }
 
-    @Test func oldPrefsKeepTheirValues() throws {
-        let old = #"{"notifyWork":false,"notifyComments":true,"notifyExtensions":true,"notifyExpiry":true,"dailySummary":false,"quietHours":true,"bumpDays":[2,7],"hideComplete":false,"hideMoodle":true,"oldestFirst":true,"theme":"dark"}"#
+    @Test func decodesOldPrefs() throws {
+        let old = """
+        {"notifyWork":false,"notifyComments":true,"notifyExtensions":true,"notifyExpiry":true,"dailySummary":false,"quietHours":true,
+         "bumpDays":[2,7],"hideComplete":false,"hideMoodle":true,"oldestFirst":true,"theme":"dark"}
+        """
         let p = try JSONDecoder().decode(Prefs.self, from: Data(old.utf8))
         #expect(p.notifyWork == false && p.dailySummary == false && p.hideComplete == false)
         #expect(p.bumpEnabled == [true, false, false, true])
@@ -251,12 +244,12 @@ import UserNotifications
         #expect(back == q)
     }
 
-    @Test func summaryFiresOnChosenDaysAndTime() {
+    @Test func summarySchedule() {
         var cal = Calendar(identifier: .gregorian)
         cal.timeZone = .current
         var p = Prefs()
         p.summaryAt = 17 * 60 + 30
-        p.summaryDays = [1]  // Sundays only
+        p.summaryDays = [1]  // sundays only
         let now = Date.now
         let next = Notifier.nextSummary(after: now, prefs: p, calendar: cal)!
         #expect(next > now && next.timeIntervalSince(now) <= 7 * 86_400 + 3600)
@@ -266,15 +259,12 @@ import UserNotifications
         #expect(Notifier.nextSummary(after: now, prefs: p, calendar: cal) == nil)
     }
 
-    @Test func remindersCanFireAtASetTime() {
+    @Test func bumpsAtSetTime() {
         let cal = Calendar.current
         let now = Date.now
-        // the 2-day reminder should land on the first 09:15 after the 2-day mark
+        // the 2-day bump should land on the first 09:15 after the 2-day mark
         let submitted = now.addingTimeInterval(-1.5 * 86_400)
-        let t = TaskSummary(id: 9, projectId: 1, taskDefinitionId: 1, tutorialId: nil, statusKey: "ready_for_feedback",
-                            completionDate: nil, submissionDate: submitted.formatted(Date.ISO8601FormatStyle()),
-                            timesAssessed: 0, grade: nil, qualityPts: -1, numNewComments: 0, similarityFlag: false,
-                            pinned: false, hasExtensions: false)
+        let t = task(.readyForFeedback, id: 9, submitted: submitted.formatted(Date.ISO8601FormatStyle()))
         var prefs = Prefs()
         prefs.quietHours = false
         prefs.bumpAt = 9 * 60 + 15
@@ -300,26 +290,26 @@ import UserNotifications
 }
 
 @Suite struct EncodingTests {
-    @Test func multipartBodyFormat() {
+    @Test func multipartBody() {
         var m = Multipart(boundary: "B")
         m.add("comment", "hi there")
         m.add("reply_to_id", "42")
         let body = String(decoding: m.encoded(), as: UTF8.self)
+        let expected = "--B\r\nContent-Disposition: form-data; name=\"comment\"\r\n\r\nhi there\r\n"
+            + "--B\r\nContent-Disposition: form-data; name=\"reply_to_id\"\r\n\r\n42\r\n--B--\r\n"
         #expect(m.contentType == "multipart/form-data; boundary=B")
-        #expect(body == "--B\r\nContent-Disposition: form-data; name=\"comment\"\r\n\r\nhi there\r\n--B\r\nContent-Disposition: form-data; name=\"reply_to_id\"\r\n\r\n42\r\n--B--\r\n")
+        #expect(body == expected)
     }
 
-    @Test func readsStoredZipAndSkipsJunk() throws {
+    @Test func zipSkipsJunk() throws {
         let entries = try Zip.entries(TestZip.stored(["a.tex": "\\section{x}", "dir/": "", "__MACOSX/a.tex": "junk", "b.txt": "hello"]))
         #expect(entries.map(\.path).sorted() == ["a.tex", "b.txt"])
-        let b = entries.first(where: { $0.path == "b.txt" })
-        let text = b.map { String(decoding: $0.data, as: UTF8.self) }
-        #expect(text == "hello")
-        let allText = entries.allSatisfy(\.isText)
-        #expect(allText)
+        let b = try #require(entries.first { $0.path == "b.txt" })
+        #expect(String(decoding: b.data, as: UTF8.self) == "hello")
+        #expect(entries.allSatisfy { $0.isText })
     }
 
-    @Test func signInRedirectIsCaught() {
+    @Test func signInRedirect() {
         let url = URL(string: "https://formatif.cse.unsw.edu.au/sign_in?authToken=abc123&username=z1234567")!
         let got = SSOWebView.Coordinator.token(from: url)
         #expect(got?.0 == "abc123")
@@ -328,39 +318,25 @@ import UserNotifications
     }
 }
 
-/// Builds an uncompressed zip. CRCs stay zero because the reader ignores them.
+// uncompressed zip with zero crcs, which Zip doesn't check
 enum TestZip {
     static func stored(_ files: [String: String]) -> Data {
-        var out = Data()
-        var central = Data()
-        func u16(_ v: Int) -> [UInt8] { [UInt8(v & 0xff), UInt8((v >> 8) & 0xff)] }
-        func u32(_ v: Int) -> [UInt8] { u16(v & 0xffff) + u16((v >> 16) & 0xffff) }
+        func u16(_ v: Int) -> [UInt8] { [UInt8(v & 0xff), UInt8(v >> 8 & 0xff)] }
+        func u32(_ v: Int) -> [UInt8] { u16(v & 0xffff) + u16(v >> 16 & 0xffff) }
+        func zeros(_ n: Int) -> [UInt8] { [UInt8](repeating: 0, count: n) }
+
+        var local: [UInt8] = [], central: [UInt8] = []
         for (name, text) in files.sorted(by: { $0.key < $1.key }) {
             let n = [UInt8](name.utf8), d = [UInt8](text.utf8)
-            let offset = out.count
-            var local: [UInt8] = u32(0x04034b50)
-            local += u16(20); local += u16(0); local += u16(0); local += u16(0); local += u16(0)
-            local += u32(0); local += u32(d.count); local += u32(d.count)
-            local += u16(n.count); local += u16(0); local += n; local += d
-            out.append(contentsOf: local)
-            var cd: [UInt8] = u32(0x02014b50)
-            cd += u16(20); cd += u16(20); cd += u16(0); cd += u16(0); cd += u16(0); cd += u16(0)
-            cd += u32(0); cd += u32(d.count); cd += u32(d.count)
-            cd += u16(n.count); cd += u16(0); cd += u16(0); cd += u16(0); cd += u16(0)
-            cd += u32(0); cd += u32(offset); cd += n
-            central.append(contentsOf: cd)
+            // crc, compressed size, size, name length
+            let sizes = u32(0) + u32(d.count) + u32(d.count) + u16(n.count)
+            central += u32(0x02014b50) + u16(20) + u16(20) + zeros(8) + sizes + zeros(12) + u32(local.count) + n
+            local += u32(0x04034b50) + u16(20) + zeros(8) + sizes + u16(0) + n + d
         }
-        let cdOffset = out.count
-        out.append(central)
-        var end: [UInt8] = u32(0x06054b50)
-        end += u16(0); end += u16(0); end += u16(files.count); end += u16(files.count)
-        end += u32(central.count); end += u32(cdOffset); end += u16(0)
-        out.append(contentsOf: end)
-        return out
+        let end = u32(0x06054b50) + zeros(4) + u16(files.count) + u16(files.count) + u32(central.count) + u32(local.count) + u16(0)
+        return Data(local + central + end)
     }
 }
-
-// MARK: - Client requests
 
 final class MockProtocol: URLProtocol, @unchecked Sendable {
     nonisolated(unsafe) static var handler: ((URLRequest) -> (Int, [String: String], Data))?
@@ -400,13 +376,13 @@ final class MockProtocol: URLProtocol, @unchecked Sendable {
         let cfg = URLSessionConfiguration.ephemeral
         cfg.protocolClasses = [MockProtocol.self]
         let now = Date.now
-        let creds = Credentials(username: "z1234567", authToken: "old", refreshToken: "R1", userID: 1, firstName: nil, lastName: nil,
+        let creds = Credentials(username: "z1234567", authToken: "old", refreshToken: "R1", userID: 1,
                                 signedInAt: now, refreshExpiry: now.addingTimeInterval(86_400), tokenIssuedAt: now)
         MockProtocol.log = []
         return FormatifClient(credentials: creds, session: URLSession(configuration: cfg), persist: false)
     }
 
-    @Test func setStatusSendsAPut() async throws {
+    @Test func setStatusRequest() async throws {
         let client = makeClient()
         MockProtocol.handler = { _ in (200, ["Content-Type": "application/json"], Data("{}".utf8)) }
         try await LiveBackend(client: client).setStatus(TaskKey(projectID: 5, taskDefID: 6), trigger: .complete, grade: nil, qualityPts: -1)
@@ -422,7 +398,7 @@ final class MockProtocol: URLProtocol, @unchecked Sendable {
         #expect(body?["grade"] is NSNull)
     }
 
-    @Test func commentIsSentAsMultipart() async throws {
+    @Test func commentRequest() async throws {
         let client = makeClient()
         MockProtocol.handler = { _ in (201, [:], Data(#"{"id":9,"comment":"hey","type":"text"}"#.utf8)) }
         let c = try await LiveBackend(client: client).postComment(TaskKey(projectID: 1, taskDefID: 2), text: "hey", replyTo: 7)
@@ -435,7 +411,7 @@ final class MockProtocol: URLProtocol, @unchecked Sendable {
         #expect(body.contains("name=\"reply_to_id\"\r\n\r\n7"))
     }
 
-    @Test func duplicateCommentGivesAReadableError() async {
+    @Test func duplicateComment() async {
         let client = makeClient()
         MockProtocol.handler = { _ in (403, [:], Data(#"{"error":"This comment duplicates the last one"}"#.utf8)) }
         await #expect(throws: APIError.duplicate("This comment duplicates the last one")) {
@@ -443,7 +419,7 @@ final class MockProtocol: URLProtocol, @unchecked Sendable {
         }
     }
 
-    @Test func concurrent419sShareOneRefresh() async throws {
+    @Test func refreshesOnce() async throws {
         let client = makeClient()
         MockProtocol.handler = { req in
             if req.url?.path == "/api/auth/access-token" {

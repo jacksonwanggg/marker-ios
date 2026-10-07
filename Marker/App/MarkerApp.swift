@@ -29,18 +29,20 @@ struct MarkerApp: App {
 }
 
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
-    func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+    func application(_ application: UIApplication,
+                     didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
         UNUserNotificationCenter.current().delegate = self
         Notifier.registerCategories()
         return true
     }
 
-    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
+    nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter,
+                                            willPresent notification: UNNotification) async -> UNNotificationPresentationOptions {
         [.banner, .list, .sound]
     }
 
     nonisolated func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse) async {
-        // "Mark as read later" only dismisses the notification. Nothing is sent to Formatif.
+        // "Mark as read later" just dismisses it, nothing goes to Formatif
         guard response.actionIdentifier == UNNotificationDefaultActionIdentifier else { return }
         let info = response.notification.request.content.userInfo
         guard let p = info["projectID"] as? Int, let td = info["taskDefID"] as? Int else { return }

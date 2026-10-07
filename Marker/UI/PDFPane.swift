@@ -12,12 +12,18 @@ struct PDFPane: View {
     @State private var fullScreen = false
     @FocusState private var searchFocused: Bool
 
+    private var pageLabel: String { "Page \(page) of \(document.pageCount)" }
+
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 4) {
-                Text(name).font(.caption.monospaced()).foregroundStyle(Palette.fg2).lineLimit(1).truncationMode(.middle)
+                Text(name)
+                    .font(.caption.monospaced())
+                    .foregroundStyle(Palette.fg2)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
                 Spacer(minLength: 8)
-                Text("Page \(page) of \(document.pageCount)").font(.caption).monospacedDigit().foregroundStyle(Palette.fg2)
+                Text(pageLabel).font(.caption).monospacedDigit().foregroundStyle(Palette.fg2)
                 Button {
                     searching.toggle()
                     searchFocused = searching
@@ -41,7 +47,8 @@ struct PDFPane: View {
                         .submitLabel(.search)
                         .focused($searchFocused)
                         .onSubmit(runSearch)
-                    Text(matches.isEmpty ? "" : "\(matchIndex + 1)/\(matches.count)").font(.caption).monospacedDigit().foregroundStyle(Palette.fg2)
+                    Text(matches.isEmpty ? "" : "\(matchIndex + 1)/\(matches.count)")
+                        .font(.caption).monospacedDigit().foregroundStyle(Palette.fg2)
                     Button { move(-1) } label: { Image(systemName: "chevron.up") }.disabled(matches.isEmpty)
                     Button { move(1) } label: { Image(systemName: "chevron.down") }.disabled(matches.isEmpty)
                 }
@@ -60,9 +67,7 @@ struct PDFPane: View {
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) { Button("Done") { fullScreen = false } }
-                        ToolbarItem(placement: .status) {
-                            Text("Page \(page) of \(document.pageCount)").font(.caption).monospacedDigit()
-                        }
+                        ToolbarItem(placement: .status) { Text(pageLabel).font(.caption).monospacedDigit() }
                     }
             }
         }
