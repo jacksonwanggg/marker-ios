@@ -1,0 +1,11 @@
+# generated from project.yml by xcodegen
+Marker.xcodeproj/
+
+build/
+DerivedData/
+*.xcresult
+xcuserdata/
+.DS_Store
+
+# demo video and narration clips
+demo/

@@ -1,0 +1,82 @@
+name: Marker
+options:
+  bundleIdPrefix: com.jacksonwang
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+  developmentLanguage: en
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    # your Apple team id (or set it in Xcode > Signing)
+    DEVELOPMENT_TEAM: ZQCJYCF2FX
+    CODE_SIGN_STYLE: Automatic
+targets:
+  Marker:
+    type: application
+    platform: iOS
+    sources:
+      - path: Marker
+    info:
+      path: Marker/Info.plist
+      properties:
+        CFBundleDisplayName: Marker
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        LSRequiresIPhoneOS: true
+        UILaunchScreen:
+          UIColorName: LaunchBackground
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIApplicationSupportsIndirectInputEvents: true
+        UIBackgroundModes:
+          - fetch
+        BGTaskSchedulerPermittedIdentifiers:
+          - com.jacksonwang.marker.refresh
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jacksonwang.marker
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        ENABLE_PREVIEWS: true
+  MarkerTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: MarkerTests
+    dependencies:
+      - target: Marker
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jacksonwang.marker.tests
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: true
+  MarkerUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: MarkerUITests
+    dependencies:
+      - target: Marker
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.jacksonwang.marker.uitests
+        TARGETED_DEVICE_FAMILY: "1"
+        GENERATE_INFOPLIST_FILE: true
+        TEST_TARGET_NAME: Marker
+schemes:
+  Marker:
+    build:
+      targets:
+        Marker: all
+        MarkerTests: [test]
+        MarkerUITests: [test]
+    test:
+      targets:
+        - MarkerTests
+        - MarkerUITests
