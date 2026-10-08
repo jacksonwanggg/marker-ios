@@ -362,6 +362,7 @@ final class AppModel {
             await Notifier.clearAll()
             DiskCache.clearAll()
         }
+        TempFiles.clear()
         client = nil
         backend = SignedOutBackend()
         isDemo = false

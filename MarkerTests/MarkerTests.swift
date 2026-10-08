@@ -315,6 +315,7 @@ private func task(_ status: TaskStatus, id: Int = 1, taskDef: Int = 3, comments:
         #expect(got?.0 == "abc123")
         #expect(got?.1 == "z1234567")
         #expect(SSOWebView.Coordinator.token(from: URL(string: "https://login.microsoftonline.com/x?authToken=a&username=b")!) == nil)
+        #expect(SSOWebView.Coordinator.token(from: URL(string: "http://formatif.cse.unsw.edu.au/sign_in?authToken=a&username=b")!) == nil)
     }
 }
 
@@ -439,6 +440,19 @@ final class MockProtocol: URLProtocol, @unchecked Sendable {
         let creds = await client.credentials
         #expect(creds?.authToken == "new")
         #expect(creds?.refreshToken == "R2")
+    }
+
+    @Test func redirectsStayOnFormatif() async {
+        let stay = StayOnFormatif()
+        let task = URLSession.shared.dataTask(with: FormatifClient.api)
+        let resp = HTTPURLResponse(url: FormatifClient.api, statusCode: 302, httpVersion: nil, headerFields: nil)!
+        func follows(_ s: String) async -> Bool {
+            await stay.urlSession(.shared, task: task, willPerformHTTPRedirection: resp, newRequest: URLRequest(url: URL(string: s)!)) != nil
+        }
+        #expect(await follows("https://formatif.cse.unsw.edu.au/api/units"))
+        #expect(await follows("https://example.com/") == false)
+        #expect(await follows("http://formatif.cse.unsw.edu.au/api/units") == false)
+        #expect(throws: APIError.self) { try FormatifClient.check(Data(), resp) }
     }
 
     @Test func deadRefreshTokenEndsSession() async {

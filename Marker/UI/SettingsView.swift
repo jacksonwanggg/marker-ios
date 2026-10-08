@@ -243,7 +243,7 @@ struct AboutView: View {
                     You sign in on Microsoft's own page, so Marker never sees your password. Apart from that page, \
                     Marker only talks to formatif.cse.unsw.edu.au. Your session token stays in the iOS Keychain, and \
                     your inbox and student list are cached on this iPhone so the app opens straight away, even offline. \
-                    There's no Marker server and no analytics or tracking.
+                    Signing out deletes all of it. There's no Marker server and no analytics or tracking.
                     """)
                 Text("Side effects in Formatif").font(.headline)
                 Text("""

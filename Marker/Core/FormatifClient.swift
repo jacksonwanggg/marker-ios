@@ -48,7 +48,7 @@ actor FormatifClient {
         cfg.urlCache = nil
         cfg.requestCachePolicy = .reloadIgnoringLocalCacheData
         cfg.timeoutIntervalForRequest = 60
-        return URLSession(configuration: cfg)
+        return URLSession(configuration: cfg, delegate: StayOnFormatif(), delegateQueue: nil)
     }
 
     static func url(_ path: String, query: [URLQueryItem] = []) -> URL {
@@ -124,7 +124,7 @@ actor FormatifClient {
     }
 
     static func check(_ data: Data, _ resp: HTTPURLResponse) throws {
-        guard resp.statusCode >= 400 else { return }
+        guard resp.statusCode >= 300 else { return }
         let msg = errorMessage(data)
         if resp.statusCode == 403, msg.lowercased().contains("duplicate") { throw APIError.duplicate(msg) }
         if resp.statusCode == 419 || resp.statusCode == 401 {
@@ -281,5 +281,13 @@ actor FormatifClient {
         let name = cd[r.upperBound...].split(separator: ";").first.map(String.init) ?? ""
         let trimmed = name.trimmingCharacters(in: CharacterSet(charactersIn: "\" "))
         return trimmed.isEmpty ? nil : trimmed
+    }
+}
+
+// URLSession copies the auth-token header onto redirects, so never follow one off Formatif
+final class StayOnFormatif: NSObject, URLSessionTaskDelegate, Sendable {
+    func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
+                    newRequest request: URLRequest) async -> URLRequest? {
+        request.url?.scheme == "https" && request.url?.host == FormatifClient.host ? request : nil
     }
 }

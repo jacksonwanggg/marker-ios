@@ -26,8 +26,8 @@ enum Keychain {
         guard let data = try? JSONEncoder().encode(creds) else { return }
         let attrs: [String: Any] = [
             kSecValueData as String: data,
-            // background refresh runs while the phone is locked
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock,
+            // readable while locked for background refresh, never backed up or moved to another phone
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly,
         ]
         if SecItemUpdate(item as CFDictionary, attrs as CFDictionary) == errSecItemNotFound {
             SecItemAdd(item.merging(attrs) { $1 } as CFDictionary, nil)

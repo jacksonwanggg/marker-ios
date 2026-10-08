@@ -163,7 +163,7 @@ struct SSOWebView: UIViewRepresentable {
         init(_ parent: SSOWebView) { self.parent = parent }
 
         nonisolated static func token(from url: URL) -> (String, String)? {
-            guard url.host == FormatifClient.host else { return nil }
+            guard url.scheme == "https", url.host == FormatifClient.host else { return nil }
             var items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
             // the one-time token can also come after the # route
             if let frag = url.fragment, let q = frag.split(separator: "?", maxSplits: 1).last,

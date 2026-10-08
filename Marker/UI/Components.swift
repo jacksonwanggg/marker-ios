@@ -197,6 +197,13 @@ enum TempFiles {
             return nil
         }
     }
+
+    static func clear() {
+        let fm = FileManager.default
+        for url in (try? fm.contentsOfDirectory(at: fm.temporaryDirectory, includingPropertiesForKeys: nil)) ?? [] {
+            try? fm.removeItem(at: url)
+        }
+    }
 }
 
 extension View {
