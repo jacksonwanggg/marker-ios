@@ -191,6 +191,7 @@ final class AppModel {
 
     private func startLive(_ c: Credentials, persist: Bool = true) async {
         let client = FormatifClient(credentials: c, persist: persist)
+        await client.onExpire { [weak self, weak client] in await self?.expired(client) }
         self.client = client
         backend = LiveBackend(client: client)
         isDemo = false
@@ -372,6 +373,12 @@ final class AppModel {
         scope = .mine; statusFilter = nil; search = ""; waitingOnly = false
         signOutReason = reason
         phase = .signedOut
+    }
+
+    // Formatif ended the session, so sign out wherever the user is
+    private func expired(_ c: FormatifClient?) async {
+        guard let c, c === client, phase == .signedIn else { return }
+        await reset(reason: APIError.sessionExpired.errorDescription)
     }
 
     func message(_ error: Error) -> String {

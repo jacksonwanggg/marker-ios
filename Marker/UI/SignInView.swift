@@ -45,7 +45,12 @@ struct SignInView: View {
             Spacer()
             VStack(spacing: 10) {
                 if let msg = error ?? model.signOutReason {
-                    Text(msg).font(.footnote).foregroundStyle(Palette.err).frame(maxWidth: .infinity, alignment: .leading)
+                    Label(msg, systemImage: "exclamationmark.circle.fill")
+                        .font(.subheadline)
+                        .foregroundStyle(Palette.err)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(12)
+                        .background(Palette.err.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
                 }
                 Button {
                     Task { await startSSO() }

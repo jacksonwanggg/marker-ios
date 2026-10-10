@@ -10,7 +10,7 @@ enum APIError: LocalizedError, Equatable {
     var errorDescription: String? {
         switch self {
         case .notSignedIn: "You're not signed in."
-        case .sessionExpired: "Your UNSW sign-in has ended. Sign in again."
+        case .sessionExpired: "Your Formatif sign-in has expired. Formatif logins last a week, so sign in again."
         case .http(let code, let msg): msg.isEmpty ? "Formatif returned \(code)." : msg
         case .duplicate: "Formatif rejected this comment: it is identical to your last one."
         case .badResponse(let msg): msg
@@ -32,6 +32,7 @@ actor FormatifClient {
     private let persist: Bool
     private(set) var credentials: Credentials?
     private var refreshing: Task<Credentials, Error>?
+    private var expired: (@Sendable () async -> Void)?
 
     init(credentials: Credentials?, session: URLSession? = nil, persist: Bool = true) {
         self.session = session ?? Self.makeSession()
@@ -181,13 +182,12 @@ actor FormatifClient {
         req.httpBody = Data("{}".utf8)
         let (data, resp) = try await session.data(for: req)
         guard let http = resp as? HTTPURLResponse else { throw APIError.badResponse("No response from Formatif.") }
-        if (400..<500).contains(http.statusCode) {
-            expire()
-            throw APIError.sessionExpired
-        }
+        guard http.statusCode < 500 else { throw APIError.http(http.statusCode, Self.errorMessage(data)) }
+        // an expired refresh token gets 201 with a null body, or a 4xx
         guard (200..<300).contains(http.statusCode),
               let auth = try? JSON.decoder().decode(AuthResponse.self, from: data) else {
-            throw APIError.http(http.statusCode, Self.errorMessage(data))
+            expire()
+            throw APIError.sessionExpired
         }
         c.authToken = auth.authToken
         c.tokenIssuedAt = .now
@@ -205,9 +205,12 @@ actor FormatifClient {
         _ = try? await refreshShared(failedToken: c.authToken)
     }
 
+    func onExpire(_ f: @escaping @Sendable () async -> Void) { expired = f }
+
     private func expire() {
         credentials = nil
         if persist { Keychain.deleteCredentials() }
+        if let f = expired { Task { await f() } }
     }
 
     func signOut() async {

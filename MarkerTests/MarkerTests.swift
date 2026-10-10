@@ -465,4 +465,25 @@ final class MockProtocol: URLProtocol, @unchecked Sendable {
         }
         #expect(await client.credentials == nil)
     }
+
+    // what Formatif sends once the week-long login is over
+    @Test func nullRefreshSignsOut() async {
+        let client = makeClient()
+        let signedOut = Flag()
+        await client.onExpire { await signedOut.set() }
+        MockProtocol.handler = { req in
+            req.url?.path == "/api/auth/access-token" ? (201, ["Content-Type": "application/json"], Data("null".utf8)) : (419, [:], Data())
+        }
+        await #expect(throws: APIError.sessionExpired) {
+            _ = try await LiveBackend(client: client).inbox(unitID: 1, myStudentsOnly: true)
+        }
+        #expect(await client.credentials == nil)
+        for _ in 0..<50 where await !signedOut.value { try? await Task.sleep(for: .milliseconds(10)) }
+        #expect(await signedOut.value)
+    }
+}
+
+actor Flag {
+    var value = false
+    func set() { value = true }
 }
